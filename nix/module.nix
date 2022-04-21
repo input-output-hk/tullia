@@ -542,7 +542,6 @@
                   name = "${config.name}-podman";
                   runtimeInputs = [pkgs.coreutils-full pkgs.podman config.oci.image.copyTo];
                   text = ''
-                    set -x
                     # Podman _can_ work without new(g|u)idmap, but user
                     # mapping will be a bit wonky.
                     # The problem is that they require suid, so we have to
@@ -625,8 +624,6 @@
                   name = "${config.name}-nsjail";
                   runtimeInputs = with pkgs; [coreutils-full nsjail];
                   text = ''
-                    set -x
-
                     # TODO: This is tied to systemd... find a way to make it cross-platform.
                     uid="$(id -u)"
                     gid="$(id -g)"
@@ -724,7 +721,7 @@
 
             cwd = mkOption {
               type = str;
-              default = "/local";
+              default = task.workingDir;
               description = "change to this directory before starting the script startup";
             };
 

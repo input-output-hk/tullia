@@ -26,4 +26,23 @@
       .${name};
   in
     pkgs.lib.mapAttrs (actionName: action: (evalAction actionName)) actionModule.config.action;
+
+  evalTasks = modules:
+    (pkgs.lib.evalModules {
+      modules =
+        [
+          {
+            _file = ./lib.nix;
+            _module.args = {
+              inherit pkgs;
+              name = "";
+              id = "";
+              inputs = {};
+            };
+          }
+          ./module.nix
+        ]
+        ++ modules;
+    })
+    .config;
 }

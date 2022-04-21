@@ -3,11 +3,11 @@
   buildGoModule,
   go-mockery,
 }: let
-  final = package "sha256-K0Qbz3WDutHDkGYz/0ZpL4Ix8IwfRlu5cT5lXCwr2rE=";
+  final = package "sha256-FlT/W+mBpxYJCvjGZyyw5wcUYpsoV9E+JMTeCVVcpD8=";
   package = vendorSha256:
     buildGoModule rec {
       pname = "tullia";
-      version = "2022.04.19.001";
+      version = "2022.04.21.001";
       inherit vendorSha256;
 
       passthru.invalidHash =
@@ -22,6 +22,10 @@
 
       preBuild = ''
         go generate ./...
+      '';
+
+      postInstall = ''
+        mv $out/bin/cli $out/bin/tullia
       '';
 
       ldflags = [
