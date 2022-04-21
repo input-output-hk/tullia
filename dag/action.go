@@ -100,7 +100,7 @@ func (a *Action) Elapsed() time.Duration {
 	if a.finished != nil {
 		return a.finished.Sub(a.started)
 	} else {
-		return time.Now().Sub(a.started)
+		return time.Since(a.started)
 	}
 }
 

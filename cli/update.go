@@ -54,7 +54,7 @@ func (m *Model) actionRetry() {
 	if err != nil {
 		return
 	}
-	action.Retry()
+	m.lastErr = action.Retry()
 }
 
 func (m *Model) moveCursor(n int) {

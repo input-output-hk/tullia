@@ -142,7 +142,9 @@ func (d *DAG) prepareInner(vert *gdag.Vertex) error {
 			d.prepare.Wait()
 
 			if fail(a.eval()) {
+				return
 			}
+
 			if fail(a.build()) {
 				return
 			}
@@ -163,7 +165,9 @@ func (d *DAG) prepareInner(vert *gdag.Vertex) error {
 		}()
 
 		for _, predecessor := range predecessors {
-			d.prepareInner(predecessor)
+			if fail(d.prepareInner(predecessor)) {
+				return
+			}
 		}
 	})
 
