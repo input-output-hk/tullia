@@ -33,12 +33,12 @@
   # attributes to overwrite or add as the result.
   # The result of the preset finally serves as the base of the module
   # evaluation that the user sees and can modify, so ensure proper precedence.
-  presets = {
+  presets = rec {
     # You're on your own.
     empty = _: {};
 
     # A preset with enough to comfortably run Nix builds.
-    nix = {config, ...}: {
+    ci = {config, ...}: {
       dependencies = with pkgs; [
         bashInteractive
         cacert
@@ -71,6 +71,8 @@
           sandbox = false
         '';
       };
+
+      workingDir = "/repo";
 
       nsjail.env.USER = "nixbld1";
       nsjail.mount."/tmp".options.size = 1024;
@@ -158,7 +160,7 @@
 
       preset = mkOption {
         type = enum (lib.attrNames presets);
-        default = "nix";
+        default = "ci";
       };
 
       run = mkOption {

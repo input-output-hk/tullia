@@ -4,7 +4,6 @@
   config,
   ...
 }: let
-  pp = v: __trace (__toJSON v) v;
   name = "tullia/ci/lintAndBuild";
   start = inputs.start.value.${name}.start;
 in {
@@ -28,32 +27,23 @@ in {
     };
 
     job.${name}.group.${name}.task = {
-      inherit (config.task) tidy lint;
+      inherit (config.task) tidy lint build;
     };
   };
 
   task.tidy = {
     dependencies = with pkgs; [go gcc];
-    workingDir = "/repo";
-    command = ''
-      go mod tidy -v
-    '';
+    command = "go mod tidy -v";
   };
 
   task.lint = {
     dependencies = with pkgs; [go golangci-lint gcc];
     after = [config.task.tidy];
-    workingDir = "/repo";
-    command = ''
-      golangci-lint run
-    '';
+    command = "golangci-lint run";
   };
 
   task.build = {
-    workingDir = "/repo";
     after = [config.task.lint];
-    command = ''
-      nix build
-    '';
+    command = "nix build";
   };
 }
