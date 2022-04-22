@@ -13,7 +13,7 @@ import (
 type Config struct {
 	Flake  string `arg:"-f,--flake"`
 	System string `arg:"--system"`
-	Action string `arg:"positional"`
+	Task   string `arg:"positional"`
 }
 
 func (c Config) FlakeAttr() string {
@@ -21,7 +21,7 @@ func (c Config) FlakeAttr() string {
 }
 
 func main() {
-	config := Config{Flake: ".", Action: "", System: currentSystem()}
+	config := Config{Flake: ".", Task: "", System: currentSystem()}
 	arg.MustParse(&config)
 
 	dag, err := dag.New(config.FlakeAttr())
@@ -30,7 +30,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	if err := dag.Prepare(config.Action); err != nil {
+	if err := dag.Prepare(config.Task); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}

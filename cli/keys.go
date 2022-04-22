@@ -11,8 +11,8 @@ type KeyMap struct {
 	LogOnly     key.Binding
 	LogPageUp   key.Binding
 	LogPageDown key.Binding
-	ActionRetry key.Binding
-	ActionKill  key.Binding
+	TaskRetry   key.Binding
+	TaskKill    key.Binding
 }
 
 var Keys = KeyMap{
@@ -48,18 +48,18 @@ var Keys = KeyMap{
 		key.WithKeys("pgdown"),
 		key.WithHelp("pgdown", "Page down in the log"),
 	),
-	ActionRetry: key.NewBinding(
+	TaskRetry: key.NewBinding(
 		key.WithKeys("R"),
-		key.WithHelp("R", "Retry action"),
+		key.WithHelp("R", "Retry task"),
 	),
-	ActionKill: key.NewBinding(
+	TaskKill: key.NewBinding(
 		key.WithKeys("K"),
-		key.WithHelp("K", "Kill action"),
+		key.WithHelp("K", "Kill task"),
 	),
 }
 
 func (k KeyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Quit, k.Help, k.Up, k.Down, k.LogOnly, k.ActionKill, k.ActionRetry}
+	return []key.Binding{k.Quit, k.Help, k.Up, k.Down, k.LogOnly, k.TaskKill, k.TaskRetry}
 }
 
 func (k KeyMap) FullHelp() [][]key.Binding {

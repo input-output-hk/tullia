@@ -33,14 +33,14 @@ func (m *Model) View() string {
 			Width((m.width/2)-1).
 			Height((height/2)-1).
 			Border(lipgloss.NormalBorder(), true).
-			Render(m.viewActions())
+			Render(m.viewTasks())
 
 		leftBot := lipgloss.NewStyle().
 			Padding(0, 1).
 			Width((m.width/2)-1).
 			Height((height/2)-1).
 			Border(lipgloss.NormalBorder(), true).
-			Render(m.viewAction())
+			Render(m.viewTask())
 
 		return lipgloss.JoinVertical(0,
 			lipgloss.JoinHorizontal(0,
@@ -48,10 +48,10 @@ func (m *Model) View() string {
 	}
 }
 
-func (m *Model) viewAction() string {
-	action, err := m.getCursorItem()
+func (m *Model) viewTask() string {
+	task, err := m.getCursorItem()
 	if err != nil {
-		return "no action selected"
+		return "no task selected"
 	}
 
 	lines := []string{}
@@ -69,22 +69,22 @@ func (m *Model) viewAction() string {
 		lines = append(lines, v)
 	}
 
-	add("Name", action.Name())
-	add("Stage", action.Stage())
-	if elapsed := action.Elapsed(); elapsed != 0 {
-		add("Duration", action.Elapsed())
+	add("Name", task.Name())
+	add("Stage", task.Stage())
+	if elapsed := task.Elapsed(); elapsed != 0 {
+		add("Duration", task.Elapsed())
 	}
 
-	if pid := action.Pid(); pid != 0 {
+	if pid := task.Pid(); pid != 0 {
 		add("PID", pid)
 	}
 
-	if rss := action.RSS(); rss != "" {
-		add("RSS", action.RSS())
+	if rss := task.RSS(); rss != "" {
+		add("RSS", task.RSS())
 	}
 
-	if ps := action.ProcessState(); ps != nil {
-		add("Status", action.ProcessState().String())
+	if ps := task.ProcessState(); ps != nil {
+		add("Status", task.ProcessState().String())
 		if rusage, ok := ps.SysUsage().(*syscall.Rusage); ok {
 			utime := timevalToDuration(rusage.Utime)
 			stime := timevalToDuration(rusage.Stime)
@@ -92,7 +92,7 @@ func (m *Model) viewAction() string {
 		}
 	}
 
-	if err := action.Error(); err != nil {
+	if err := task.Error(); err != nil {
 		add("Error", err.Error())
 	}
 
@@ -118,19 +118,19 @@ func (m *Model) viewLog() string {
 	stderr := common.Foreground(lipgloss.Color("#E62B0B"))
 	stdout := common.Foreground(lipgloss.Color("#EEEEEE"))
 
-	action, err := m.getCursorItem()
+	task, err := m.getCursorItem()
 	if err != nil {
-		return "select an action"
+		return "select a task"
 	}
 
 	var lines []dag.Line
 	switch m.scroll {
 	case -1:
-		lines = action.Head(m.height - 4)
+		lines = task.Head(m.height - 4)
 	case -2:
-		lines = action.Tail(m.height - 4)
+		lines = task.Tail(m.height - 4)
 	default:
-		lines = action.Log(int(m.scroll), m.height-4)
+		lines = task.Log(int(m.scroll), m.height-4)
 	}
 
 	res := []string{}
@@ -148,13 +148,13 @@ func (m *Model) viewLog() string {
 	return lipgloss.JoinVertical(0, res...)
 }
 
-var actionStyle = lipgloss.NewStyle().MaxHeight(1)
+var taskStyle = lipgloss.NewStyle().MaxHeight(1)
 
-func (m *Model) viewActions() string {
+func (m *Model) viewTasks() string {
 	nameLen := 0
-	for _, action := range m.dag.Actions() {
-		if nameLen < len(action.Name()) {
-			nameLen = len(action.Name())
+	for _, task := range m.dag.Tasks() {
+		if nameLen < len(task.Name()) {
+			nameLen = len(task.Name())
 		}
 	}
 
@@ -165,8 +165,8 @@ func (m *Model) viewActions() string {
 	}
 	width := (m.width / 2) - 5
 
-	for i, action := range m.dag.Actions() {
-		style := actionStyle.Copy().Width(width)
+	for i, task := range m.dag.Tasks() {
+		style := taskStyle.Copy().Width(width)
 		selected := " "
 		done := "[ ]"
 
@@ -174,7 +174,7 @@ func (m *Model) viewActions() string {
 			selected = ">"
 		}
 
-		switch action.Stage() {
+		switch task.Stage() {
 		case "wait":
 			style = style.Foreground(lipgloss.Color("#E6F20C"))
 		case "eval":
@@ -191,7 +191,7 @@ func (m *Model) viewActions() string {
 			style = style.Foreground(lipgloss.Color("#E62B0B"))
 		}
 
-		line := fmt.Sprintf(format, selected, done, action.Name(), action.Stage(), action.Elapsed().Round(1*time.Millisecond))
+		line := fmt.Sprintf(format, selected, done, task.Name(), task.Stage(), task.Elapsed().Round(1*time.Millisecond))
 		lines = append(lines, style.Render(line))
 	}
 

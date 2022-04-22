@@ -35,10 +35,10 @@ func (m *Model) Update(msgI tea.Msg) (tea.Model, tea.Cmd) {
 			m.pageUp()
 		case key.Matches(msg, m.keys.LogPageDown):
 			m.pageDown()
-		case key.Matches(msg, m.keys.ActionRetry):
-			m.actionRetry()
-		case key.Matches(msg, m.keys.ActionKill):
-			m.actionKill()
+		case key.Matches(msg, m.keys.TaskRetry):
+			m.taskRetry()
+		case key.Matches(msg, m.keys.TaskKill):
+			m.taskKill()
 		default:
 			m.lastMsg = msgI
 		}
@@ -49,19 +49,19 @@ func (m *Model) Update(msgI tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m *Model) actionRetry() {
-	action, err := m.getCursorItem()
+func (m *Model) taskRetry() {
+	task, err := m.getCursorItem()
 	if err != nil {
 		return
 	}
-	m.lastErr = action.Retry()
+	m.lastErr = task.Retry()
 }
 
 func (m *Model) moveCursor(n int) {
-	actions := m.dag.Actions()
+	tasks := m.dag.Tasks()
 	nn := m.cursor + n
-	if nn >= len(actions) {
-		nn = len(actions) - 1
+	if nn >= len(tasks) {
+		nn = len(tasks) - 1
 	} else if nn < 0 {
 		nn = 0
 	}
@@ -69,12 +69,12 @@ func (m *Model) moveCursor(n int) {
 	m.cursor = nn
 }
 
-func (m *Model) getCursorItem() (*dag.Action, error) {
-	actions := m.dag.Actions()
-	if m.cursor < 0 || m.cursor >= len(actions) {
+func (m *Model) getCursorItem() (*dag.Task, error) {
+	tasks := m.dag.Tasks()
+	if m.cursor < 0 || m.cursor >= len(tasks) {
 		return nil, errors.New("invalid cursor or empty list")
 	}
-	return actions[m.cursor], nil
+	return tasks[m.cursor], nil
 }
 
 func (m *Model) pageUp() {
@@ -82,11 +82,11 @@ func (m *Model) pageUp() {
 	case -1:
 		return
 	case -2:
-		action, err := m.getCursorItem()
+		task, err := m.getCursorItem()
 		if err != nil {
 			m.scroll = -1
 		} else {
-			m.scroll = Scroll(action.Len() - (m.height + (m.height / 2)))
+			m.scroll = Scroll(task.Len() - (m.height + (m.height / 2)))
 		}
 	default:
 		m.scroll -= Scroll(m.height / 2)
@@ -101,23 +101,23 @@ func (m *Model) pageDown() {
 		return
 	}
 	m.scroll += (Scroll(m.height) / 2)
-	action, err := m.getCursorItem()
+	task, err := m.getCursorItem()
 	if err != nil {
 		m.scroll = -1
 	} else {
-		if (m.height + int(m.scroll)) >= action.Len() {
+		if (m.height + int(m.scroll)) >= task.Len() {
 			m.scroll = -2
 		}
 	}
 }
 
-func (m *Model) actionKill() {
-	action, err := m.getCursorItem()
+func (m *Model) taskKill() {
+	task, err := m.getCursorItem()
 	if err != nil {
 		m.lastErr = err
 		return
 	}
-	if err := action.Signal(syscall.SIGINT); err != nil {
+	if err := task.Signal(syscall.SIGINT); err != nil {
 		m.lastErr = err
 	}
 }

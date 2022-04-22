@@ -32,7 +32,7 @@ type Line struct {
 }
 
 // TODO: make this threadsafe
-type Action struct {
+type Task struct {
 	name         string
 	storePath    string
 	dependencies *sync.WaitGroup
@@ -50,10 +50,10 @@ type Action struct {
 	mut          *sync.Mutex
 }
 
-func NewAction(name string) *Action {
+func NewTask(name string) *Task {
 	stdoutRd, stdoutWr := io.Pipe()
 	stderrRd, stderrWr := io.Pipe()
-	a := &Action{
+	a := &Task{
 		name:         name,
 		dependencies: &sync.WaitGroup{},
 		once:         &sync.Once{},
@@ -81,19 +81,19 @@ var (
 	stageErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f00"))
 )
 
-func (a *Action) Name() string {
+func (a *Task) Name() string {
 	return a.name
 }
 
-func (a *Action) Stage() string {
+func (a *Task) Stage() string {
 	return a.stage
 }
 
-func (a *Action) Error() error {
+func (a *Task) Error() error {
 	return a.err
 }
 
-func (a *Action) Elapsed() time.Duration {
+func (a *Task) Elapsed() time.Duration {
 	if a.started.IsZero() {
 		return 0
 	}
@@ -104,7 +104,7 @@ func (a *Action) Elapsed() time.Duration {
 	}
 }
 
-func (a *Action) RSS() string {
+func (a *Task) RSS() string {
 	if a.ProcessState() != nil {
 		if usage, ok := a.ProcessState().SysUsage().(*syscall.Rusage); ok {
 			return (datasize.ByteSize(usage.Maxrss) * datasize.KB).HumanReadable()
@@ -113,7 +113,7 @@ func (a *Action) RSS() string {
 	return ""
 }
 
-func (a *Action) String() string {
+func (a *Task) String() string {
 	var stage string
 	switch a.stage {
 	case "wait":
@@ -153,37 +153,37 @@ func (a *Action) String() string {
 	return a.name
 }
 
-func (a *Action) Log(fromLine, lines int) []Line {
+func (a *Task) Log(fromLine, lines int) []Line {
 	l := len(a.log)
 	fromLine = clamp(fromLine, 0, l)
 	lines = clamp(lines, 0, l-fromLine)
 	return a.log[fromLine : fromLine+lines]
 }
 
-func (a *Action) Tail(lines int) []Line {
+func (a *Task) Tail(lines int) []Line {
 	l := len(a.log)
 	lines = clamp(lines, 0, l)
 	return a.log[l-lines:]
 }
 
-func (a *Action) Head(lines int) []Line {
+func (a *Task) Head(lines int) []Line {
 	l := len(a.log)
 	lines = clamp(lines, 0, l)
 	return a.log[0:lines]
 }
 
-func (a *Action) Len() int {
+func (a *Task) Len() int {
 	return len(a.log)
 }
 
-func (a *Action) Pid() int {
+func (a *Task) Pid() int {
 	if a.cmd == nil || a.cmd.Process == nil {
 		return 0
 	}
 	return a.cmd.Process.Pid
 }
 
-func (a *Action) ProcessState() *os.ProcessState {
+func (a *Task) ProcessState() *os.ProcessState {
 	if a.cmd == nil {
 		return nil
 	}
@@ -198,7 +198,7 @@ func stripANSI(str string) string {
 	return ansiRE.ReplaceAllString(str, "")
 }
 
-func (a *Action) startPipe(kind LineType, rd io.Reader) {
+func (a *Task) startPipe(kind LineType, rd io.Reader) {
 	brd := bufio.NewReader(rd)
 	for {
 		lineText, err := brd.ReadString('\n')
@@ -229,7 +229,7 @@ func (a *Action) startPipe(kind LineType, rd io.Reader) {
 	}
 }
 
-func (a *Action) run() error {
+func (a *Task) run() error {
 	a.started = time.Now()
 	err := a.exec()
 	t := time.Now()
@@ -243,7 +243,7 @@ func (a *Action) run() error {
 	return nil
 }
 
-func (a *Action) eval() error {
+func (a *Task) eval() error {
 	a.stage = "eval"
 	eval := exec.Command("nix", "eval", "--raw", ".#task.x86_64-linux."+a.name+".run.outPath")
 	eval.Stderr = a.stderrWr
@@ -257,7 +257,7 @@ func (a *Action) eval() error {
 
 // TODO: it would be nice to condense this more and speed it up, but it avoids
 // putting symlinks all over the place.
-func (a *Action) build() error {
+func (a *Task) build() error {
 	a.stage = "build"
 	build := exec.Command("nix", "build", "--no-link", ".#task.x86_64-linux."+a.name+".run")
 	build.Stdout = a.stdoutWr
@@ -270,7 +270,7 @@ func (a *Action) build() error {
 	return nil
 }
 
-func (a *Action) exec() error {
+func (a *Task) exec() error {
 	a.stage = "run"
 	cmd := exec.Command(string(a.storePath) + "/bin/" + a.name + "-nsjail")
 	cmd.Stdout = a.stdoutWr
@@ -281,11 +281,11 @@ func (a *Action) exec() error {
 	return cmd.Run()
 }
 
-func (a *Action) StorePath() string { return a.storePath }
+func (a *Task) StorePath() string { return a.storePath }
 
-func (a *Action) Retry() error {
+func (a *Task) Retry() error {
 	if a.finished == nil {
-		return a.returnErr(errors.New("Can only restart finished actions"))
+		return a.returnErr(errors.New("Can only restart finished tasks"))
 	}
 
 	a.err = nil
@@ -299,13 +299,13 @@ func (a *Action) Retry() error {
 	return a.returnErr(a.run())
 }
 
-func (a *Action) returnErr(err error) error {
+func (a *Task) returnErr(err error) error {
 	a.stage = "error"
 	a.err = err
 	return err
 }
 
-func (a *Action) Signal(signal os.Signal) error {
+func (a *Task) Signal(signal os.Signal) error {
 	if a.cmd == nil || a.cmd.Process == nil {
 		return errors.New("Process is not running")
 	}
