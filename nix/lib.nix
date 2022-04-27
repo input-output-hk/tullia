@@ -1,11 +1,11 @@
-{pkgs}: {
+{pkgs, ...} @ args: {
   evalActions = modules: let
     actionModule = pkgs.lib.evalModules {
       modules =
         [
           {
             _file = ./lib.nix;
-            _module.args = {inherit pkgs;};
+            _module.args = args;
           }
           ./module.nix
         ]
@@ -33,12 +33,13 @@
         [
           {
             _file = ./lib.nix;
-            _module.args = {
-              inherit pkgs;
-              name = "";
-              id = "";
-              inputs = {};
-            };
+            _module.args =
+              args
+              // {
+                name = "";
+                id = "";
+                inputs = {};
+              };
           }
           ./module.nix
         ]

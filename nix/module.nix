@@ -10,6 +10,12 @@
   pp2 = a: b: __trace (__toJSON a) b;
   pp = a: __trace (__toJSON a) a;
 
+  getImageName = image:
+    lib.fileContents (pkgs.runCommand "imageName" {} ''
+      ls ${image}
+      echo "${image.imageName}:${image.imageTag}" > $out
+    '');
+
   getClosure = {
     script,
     env,
@@ -118,6 +124,11 @@
         };
       };
 
+      meta = mkOption {
+        type = attrsOf str;
+        default = {};
+      };
+
       service = mkOption {
         type = attrsOf anything;
         default = {};
@@ -126,20 +137,11 @@
 
     config = {
       # NOTE: there has to be a better way to get the original value before `apply` ran?
-      env = lib.listToAttrs (map (e: let
-          kv = lib.splitString "=" e;
-        in {
-          # Since `kv` may have referenced a derivation, we have to clean it
-          # because Nix doesn't allow attr keys to have references. This is
-          # still safe because the reference lives on in the value.
-          name = builtins.unsafeDiscardStringContext (lib.elemAt kv 0);
-          value = lib.mkDefault (lib.elemAt kv 1);
-        })
-        task.oci.config.Env);
+      env = task.oci.env;
 
       config =
         if task.nomad.driver == "podman"
-        then {image = lib.mkDefault "${task.oci.image.imageName}:${task.oci.image.imageTag}";}
+        then {image = lib.mkDefault (getImageName task.oci.image);}
         else throw "Driver '${task.nomad.driver}' not supported yet";
     };
   });
@@ -153,6 +155,36 @@
     task = config;
   in {
     options = {
+      after = mkOption {
+        type = listOf attrs;
+        default = [];
+        apply = map (a: a.name);
+      };
+
+      command = mkOption {
+        type = either str (listOf str);
+      };
+
+      dependencies = mkOption {
+        type = listOf package;
+        default = [];
+      };
+
+      env = mkOption {
+        type = attrsOf str;
+        default = let
+          preset = presets.${config.preset} {inherit config;};
+        in
+          if (preset ? env)
+          then lib.mapAttrs (key: value: lib.mkDefault value) preset.env
+          else {};
+      };
+
+      memory = mkOption {
+        type = ints.positive;
+        default = 300;
+      };
+
       name = mkOption {
         type = str;
         default = name;
@@ -168,34 +200,9 @@
         default = task.${task.runtime}.run;
       };
 
-      dependencies = mkOption {
-        type = listOf package;
-        default = [];
-      };
-
-      command = mkOption {
-        type = either str (listOf str);
-      };
-
-      after = mkOption {
-        type = listOf attrs;
-        default = [];
-        apply = map (a: a.name);
-      };
-
-      env = mkOption {
-        type = attrsOf str;
-        default = {};
-      };
-
-      memory = mkOption {
-        type = ints.positive;
-        default = 300;
-      };
-
-      workingDir = mkOption {
-        type = str;
-        default = "/local";
+      runtime = mkOption {
+        type = enum ["nsjail" "podman" "impure"];
+        default = "nsjail";
       };
 
       tag = mkOption {
@@ -203,14 +210,21 @@
         default = null;
       };
 
-      runtime = mkOption {
-        type = enum ["nsjail" "podman"];
-        default = "nsjail";
+      workingDir = mkOption {
+        type = str;
+        default = "/local";
       };
 
       oci = mkOption {
         default = {};
-        type = submodule {
+        type = submodule ({
+          config,
+          options,
+          ...
+        }: let
+          ociConfig = config;
+          ociOptions = options;
+        in {
           options = {
             image = mkOption {
               type = package;
@@ -310,176 +324,176 @@
               '';
             };
 
+            cmd = mkOption {
+              type = listOf str;
+              default = [];
+              description = ''
+                Default arguments to the entrypoint of the
+                container. These values act as defaults and may
+                be replaced by any specified when creating a
+                container. If an Entrypoint value is not
+                specified, then the first entry of the Cmd array
+                SHOULD be interpreted as the executable to run.
+              '';
+            };
+
+            entrypoint = mkOption {
+              type = listOf str;
+              default = [];
+              description = ''
+                A list of arguments to use as the command to
+                execute when the container starts. These values
+                act as defaults and may be replaced by an
+                entrypoint specified when creating a container.
+              '';
+            };
+
+            exposedPorts = mkOption {
+              type = attrsOf bool;
+              default = {};
+              description = ''
+                A set of ports to expose from a container running
+                this image. Its keys can be in the format of:
+                port/tcp, port/udp, port with the default
+                protocol being tcp if not specified. These values
+                act as defaults and are merged with any specified
+                when creating a container.
+                NOTE: This JSON structure value is unusual
+                because it is a direct JSON serialization of the
+                Go type map[string]struct{} and is represented in
+                JSON as an object mapping its keys to an empty
+                object.
+                For this config, we filter out all keys with
+                false values.
+              '';
+            };
+
+            env = mkOption {
+              type = attrsOf str;
+              default = {};
+              description = ''
+                Entries are in the format of VARNAME=VARVALUE.
+                These values act as defaults and are merged with
+                any specified when creating a container.
+              '';
+            };
+
+            volumes = mkOption {
+              type = attrsOf anything;
+              default = {};
+              description = ''
+                A set of directories describing where the
+                process is likely to write data specific to a
+                container instance. NOTE: This JSON structure
+                value is unusual because it is a direct JSON
+                serialization of the Go type
+                map[string]struct{} and is represented in JSON
+                as an object mapping its keys to an empty
+                object.
+              '';
+            };
+
+            workingDir = mkOption {
+              type = str;
+              default = task.workingDir;
+              description = ''
+                Sets the current working directory of the entrypoint
+                process in the container. This value acts as a default
+                and may be replaced by a working directory specified when
+                creating a container.
+              '';
+            };
+
+            labels = mkOption {
+              type = attrsOf str;
+              default = {};
+              description = ''
+                The field contains arbitrary metadata for the container.
+                This property MUST use the annotation rules.
+                https://github.com/opencontainers/image-spec/blob/main/annotations.md#rules
+              '';
+            };
+
+            stopSignal = mkOption {
+              type = str;
+              default = "";
+              description = ''
+                The field contains the system call signal that will be
+                sent to the container to exit. The signal can be a signal
+                name in the format SIGNAME, for instance SIGKILL or
+                SIGRTMIN+3.
+              '';
+            };
+
+            user = mkOption {
+              type = str;
+              default = "";
+              description = ''
+                The username or UID which is a platform-specific
+                structure that allows specific control over which
+                user the process run as. This acts as a default
+                value to use when the value is not specified when
+                creating a container. For Linux based systems,
+                all of the following are valid: user, uid,
+                user:group, uid:gid, uid:group, user:gid. If
+                group/gid is not specified, the default group and
+                supplementary groups of the given user/uid in
+                /etc/passwd from the container are applied.
+              '';
+            };
+
             config = mkOption {
               default = {};
               type = submodule (imageConfig: {
                 options = let
                   toGoStruct = m: lib.mapAttrs (k: v: {}) (lib.filterAttrs (k: v: v) m);
                 in {
-                  cmd = mkOption {
-                    type = listOf str;
-                    default = [];
-                    description = ''
-                      Default arguments to the entrypoint of the
-                      container. These values act as defaults and may
-                      be replaced by any specified when creating a
-                      container. If an Entrypoint value is not
-                      specified, then the first entry of the Cmd array
-                      SHOULD be interpreted as the executable to run.
-                    '';
-                  };
-
                   Cmd = mkOption {
-                    default = imageConfig.config.cmd;
-                    inherit (imageConfig.options.cmd) type description;
-                  };
-
-                  entrypoint = mkOption {
-                    type = listOf str;
-                    default = [];
-                    description = ''
-                      A list of arguments to use as the command to
-                      execute when the container starts. These values
-                      act as defaults and may be replaced by an
-                      entrypoint specified when creating a container.
-                    '';
+                    default = ociConfig.cmd;
+                    inherit (ociOptions.cmd) type description;
                   };
 
                   Entrypoint = mkOption {
-                    default = imageConfig.config.entrypoint;
-                    inherit (imageConfig.options.entrypoint) type description;
-                  };
-
-                  exposedPorts = mkOption {
-                    type = attrsOf bool;
-                    default = {};
-                    description = ''
-                      A set of ports to expose from a container running
-                      this image. Its keys can be in the format of:
-                      port/tcp, port/udp, port with the default
-                      protocol being tcp if not specified. These values
-                      act as defaults and are merged with any specified
-                      when creating a container.
-                      NOTE: This JSON structure value is unusual
-                      because it is a direct JSON serialization of the
-                      Go type map[string]struct{} and is represented in
-                      JSON as an object mapping its keys to an empty
-                      object.
-                      For this config, we filter out all keys with
-                      false values.
-                    '';
+                    default = ociConfig.entrypoint;
+                    inherit (ociOptions.entrypoint) type description;
                   };
 
                   ExposedPorts = mkOption {
                     type = attrsOf attrs;
-                    default = toGoStruct imageConfig.config.exposedPorts;
-                    inherit (imageConfig.options.exposedPorts) description;
-                  };
-
-                  env = mkOption {
-                    type = attrsOf str;
-                    default = {};
-                    description = ''
-                      Entries are in the format of VARNAME=VARVALUE.
-                      These values act as defaults and are merged with
-                      any specified when creating a container.
-                    '';
+                    default = toGoStruct ociConfig.exposedPorts;
+                    inherit (ociOptions.exposedPorts) description;
                   };
 
                   Env = mkOption {
                     type = listOf str;
-                    default = pkgs.lib.mapAttrsToList (k: v: "${k}=${v}") imageConfig.config.env;
-                    inherit (imageConfig.options.env) description;
-                  };
-
-                  user = mkOption {
-                    type = str;
-                    default = "";
-                    description = ''
-                      The username or UID which is a platform-specific
-                      structure that allows specific control over which
-                      user the process run as. This acts as a default
-                      value to use when the value is not specified when
-                      creating a container. For Linux based systems,
-                      all of the following are valid: user, uid,
-                      user:group, uid:gid, uid:group, user:gid. If
-                      group/gid is not specified, the default group and
-                      supplementary groups of the given user/uid in
-                      /etc/passwd from the container are applied.
-                    '';
+                    default = pkgs.lib.mapAttrsToList (k: v: "${k}=${v}") ociConfig.env;
+                    inherit (ociOptions.env) description;
                   };
 
                   User = mkOption {
-                    default = imageConfig.config.user;
-                    inherit (imageConfig.options.user) type description;
-                  };
-
-                  volumes = mkOption {
-                    type = attrsOf anything;
-                    default = {};
-                    description = ''
-                      A set of directories describing where the
-                      process is likely to write data specific to a
-                      container instance. NOTE: This JSON structure
-                      value is unusual because it is a direct JSON
-                      serialization of the Go type
-                      map[string]struct{} and is represented in JSON
-                      as an object mapping its keys to an empty
-                      object.
-                    '';
+                    default = ociConfig.user;
+                    inherit (ociOptions.user) type description;
                   };
 
                   Volumes = mkOption {
                     type = attrsOf attrs;
-                    default = toGoStruct imageConfig.config.volumes;
-                    inherit (imageConfig.options.volumes) description;
-                  };
-
-                  workingDir = mkOption {
-                    type = str;
-                    default = task.workingDir;
-                    description = ''
-                      Sets the current working directory of the entrypoint
-                      process in the container. This value acts as a default
-                      and may be replaced by a working directory specified when
-                      creating a container.
-                    '';
+                    default = toGoStruct ociConfig.volumes;
+                    inherit (ociOptions.volumes) description;
                   };
 
                   WorkingDir = mkOption {
-                    default = imageConfig.config.workingDir;
-                    inherit (imageConfig.options.workingDir) type description;
-                  };
-
-                  labels = mkOption {
-                    type = attrsOf str;
-                    default = {};
-                    description = ''
-                      The field contains arbitrary metadata for the container.
-                      This property MUST use the annotation rules.
-                      https://github.com/opencontainers/image-spec/blob/main/annotations.md#rules
-                    '';
+                    default = ociConfig.workingDir;
+                    inherit (ociOptions.workingDir) type description;
                   };
 
                   Labels = mkOption {
-                    default = imageConfig.config.labels;
-                    inherit (imageConfig.options.labels) type description;
-                  };
-
-                  stopSignal = mkOption {
-                    type = str;
-                    default = "";
-                    description = ''
-                      The field contains the system call signal that will be
-                      sent to the container to exit. The signal can be a signal
-                      name in the format SIGNAME, for instance SIGKILL or
-                      SIGRTMIN+3.
-                    '';
+                    default = ociConfig.labels;
+                    inherit (ociOptions.labels) type description;
                   };
 
                   StopSignal = mkOption {
-                    default = imageConfig.config.stopSignal;
-                    inherit (imageConfig.options.stopSignal) type description;
+                    default = ociConfig.stopSignal;
+                    inherit (ociOptions.stopSignal) type description;
                   };
                 };
               });
@@ -504,14 +518,12 @@
               })
             ];
 
-            config = {
-              cmd = lib.mkDefault ["${task.oci.innerScript}/bin/${task.name}"];
-              env = lib.mapAttrs (key: value: lib.mkDefault value) task.env;
-              volumes."/local" = lib.mkDefault true;
-              volumes."/tmp" = lib.mkDefault true;
-            };
+            cmd = lib.mkDefault ["${task.oci.innerScript}/bin/${task.name}"];
+            env = lib.mapAttrs (key: value: lib.mkDefault value) task.env;
+            volumes."/local" = lib.mkDefault true;
+            volumes."/tmp" = lib.mkDefault true;
           };
-        };
+        });
       };
 
       nomad = mkOption {
@@ -538,7 +550,7 @@
                   tty = true;
                   interactive = true;
                 };
-                imageName = "${config.oci.image.imageName}:${config.oci.image.imageTag}";
+                imageName = getImageName config.oci.image;
               in
                 pkgs.writeShellApplication {
                   name = "${config.name}-podman";
@@ -878,23 +890,43 @@
           };
         };
       };
+
+      impure = mkOption {
+        default = {};
+        type = submodule {
+          options = {
+            run = mkOption {
+              type = package;
+              default = pkgs.writeShellApplication {
+                name = "${task.name}-impure";
+                runtimeInputs = task.dependencies;
+                text = task.command;
+              };
+            };
+          };
+        };
+      };
     };
 
     config = let
       preset = presets.${config.preset} {inherit config;};
     in {
-      env = lib.mapAttrs (key: value: lib.mkDefault value) (preset.env or {});
-      dependencies = preset.dependencies or [];
+      after = lib.mkIf (preset ? after) (lib.mkDefault preset.after);
+      command = lib.mkIf (preset ? command) (lib.mkDefault preset.command);
+      dependencies =
+        if (preset ? dependencies)
+        then preset.dependencies
+        else [];
+      env =
+        if (preset ? env)
+        then lib.mapAttrs (key: value: lib.mkDefault value) preset.env
+        else {};
+      memory = lib.mkIf (preset ? memory) (lib.mkDefault preset.memory);
+      run = lib.mkIf (preset ? run) (lib.mkDefault preset.run);
+      runtime = lib.mkIf (preset ? runtime) (lib.mkDefault preset.runtime);
+      tag = lib.mkIf (preset ? tag) (lib.mkDefault preset.tag);
+      workingDir = lib.mkIf (preset ? workingDir) (lib.mkDefault preset.workingDir);
     };
-
-    /*
-     config = let
-     preset = presets.${config.preset} {inherit config;};
-     in {
-     dependencies = lib.mkDefault preset.dependencies;
-     env = lib.mapAttrs (key: value: lib.mkDefault value) preset.env;
-     };
-     */
   });
 
   jobType = submodule ({name, ...}: {

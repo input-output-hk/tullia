@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/input-output-hk/cicero-lib/dag"
+	"github.com/input-output-hk/tullia/dag"
 	"github.com/kr/pretty"
 	"github.com/muesli/reflow/wrap"
 )
@@ -152,7 +152,7 @@ var taskStyle = lipgloss.NewStyle().MaxHeight(1)
 
 func (m *Model) viewTasks() string {
 	nameLen := 0
-	for _, task := range m.dag.Tasks() {
+	for _, task := range m.dag.Tasks {
 		if nameLen < len(task.Name()) {
 			nameLen = len(task.Name())
 		}
@@ -165,7 +165,7 @@ func (m *Model) viewTasks() string {
 	}
 	width := (m.width / 2) - 5
 
-	for i, task := range m.dag.Tasks() {
+	for i, task := range m.dag.Tasks {
 		style := taskStyle.Copy().Width(width)
 		selected := " "
 		done := "[ ]"

@@ -21,11 +21,11 @@ type Progress struct {
 }
 
 type DAG struct {
-	taskNames []string
-	dag       *gdag.DAG
-	tasks     []*Task
-	prepare   *sync.WaitGroup
-	start     *sync.WaitGroup
+	TaskNames    []string
+	DAG          *gdag.DAG
+	Tasks        []*Task
+	PrepareGroup *sync.WaitGroup
+	StartGroup   *sync.WaitGroup
 }
 
 func New(flake string) (*DAG, error) {
@@ -51,58 +51,67 @@ func New(flake string) (*DAG, error) {
 	}
 
 	dag := &DAG{
-		dag:     gdag.NewDAG(),
-		tasks:   []*Task{},
-		prepare: &sync.WaitGroup{},
-		start:   &sync.WaitGroup{},
+		DAG:          gdag.NewDAG(),
+		Tasks:        []*Task{},
+		PrepareGroup: &sync.WaitGroup{},
+		StartGroup:   &sync.WaitGroup{},
 	}
-	dag.prepare.Add(1)
 
 	for taskName := range dagSource {
-		dag.taskNames = append(dag.taskNames, taskName)
+		dag.TaskNames = append(dag.TaskNames, taskName)
 		a := NewTask(taskName)
-		if err := dag.dag.AddVertex(gdag.NewVertex(taskName, a)); err != nil {
-			return nil, errors.WithMessagef(err, "Failed to add vertex %q -> %q", taskName, a)
+		if err := dag.DAG.AddVertex(gdag.NewVertex(taskName, a)); err != nil {
+			return nil, errors.WithMessagef(err, "Failed to add vertex %q", taskName)
 		}
 	}
 
 	for taskName, afters := range dagSource {
 		for _, after := range afters {
-			if a, err := dag.dag.GetVertex(after); err != nil {
+			if a, err := dag.DAG.GetVertex(after); err != nil {
 				return nil, errors.WithMessagef(err, "Failed to get vertex %q", after)
-			} else if k, err := dag.dag.GetVertex(taskName); err != nil {
+			} else if k, err := dag.DAG.GetVertex(taskName); err != nil {
 				return nil, errors.WithMessagef(err, "Failed to get vertex %q", taskName)
-			} else if err := dag.dag.AddEdge(a, k); err != nil {
+			} else if err := dag.DAG.AddEdge(a, k); err != nil {
 				return nil, errors.WithMessagef(err, "Failed to add edge %q -> %q", after, taskName)
 			}
 		}
 	}
 
 	for taskName := range dagSource {
-		if v, err := dag.dag.GetVertex(taskName); err != nil {
+		if v, err := dag.DAG.GetVertex(taskName); err != nil {
 			return nil, errors.WithMessagef(err, "Failed to get vertex %q", taskName)
 		} else {
-			v.Value.(*Task).dependencies.Add(len(v.Parents.Values()))
+			t := v.Value.(*Task)
+			successors, err := dag.DAG.Successors(v)
+			if err != nil {
+				return dag, errors.WithMessagef(err, "Failed to get successors of task %q", v.ID)
+			}
+			t.successors = successors
+
+			predecessors, err := dag.DAG.Predecessors(v)
+			if err != nil {
+				return dag, errors.WithMessagef(err, "Failed to get predecessors of task %q", v.ID)
+			}
+			t.predecessors = predecessors
+
+			t.dependencies.Add(len(v.Parents.Values()))
 		}
 	}
 
 	return dag, nil
 }
 
-func (d *DAG) Tasks() []*Task {
-	return d.tasks
-}
-
 func (d *DAG) Start() {
-	d.prepare.Done()
-	d.start.Wait()
+	d.PrepareGroup.Done()
+	d.StartGroup.Wait()
 }
 
 func (d *DAG) Prepare(taskName string) error {
-	root, err := d.dag.GetVertex(taskName)
+	d.PrepareGroup.Add(1)
+	root, err := d.DAG.GetVertex(taskName)
 	if err != nil {
-		if err.Error() == "vertex  not found in the graph" {
-			return fmt.Errorf("Available tasks: %s\n", strings.Join(d.taskNames, " "))
+		if err.Error() == fmt.Sprintf("vertex %s not found in the graph", taskName) {
+			return fmt.Errorf("Available tasks: %s\n", strings.Join(d.TaskNames, " "))
 		}
 		return errors.WithMessagef(err, "Failed to get vertex %q", taskName)
 	}
@@ -114,16 +123,6 @@ func (d *DAG) Prepare(taskName string) error {
 }
 
 func (d *DAG) prepareInner(vert *gdag.Vertex) error {
-	successors, err := d.dag.Successors(vert)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to get successors of task %q", vert.ID)
-	}
-
-	predecessors, err := d.dag.Predecessors(vert)
-	if err != nil {
-		return errors.WithMessagef(err, "Failed to get predecessors of task %q", vert.ID)
-	}
-
 	a := vert.Value.(*Task)
 
 	fail := func(err error) bool {
@@ -132,21 +131,21 @@ func (d *DAG) prepareInner(vert *gdag.Vertex) error {
 		}
 		a.stage = "error"
 		a.err = err
-		for _, successor := range successors {
+		for _, successor := range a.successors {
 			stask := successor.Value.(*Task)
 			stask.err = errors.WithMessagef(err, "%q failed", a.name)
 			stask.dependencies.Done()
 		}
-		d.start.Done()
+		d.StartGroup.Done()
 		return true
 	}
 
 	a.once.Do(func() {
-		d.tasks = append(d.tasks, a)
-		d.start.Add(1)
+		d.Tasks = append(d.Tasks, a)
+		d.StartGroup.Add(1)
 
 		go func() {
-			d.prepare.Wait()
+			d.PrepareGroup.Wait()
 
 			if fail(a.eval()) {
 				return
@@ -165,13 +164,13 @@ func (d *DAG) prepareInner(vert *gdag.Vertex) error {
 				return
 			}
 
-			for _, successor := range successors {
+			for _, successor := range a.successors {
 				successor.Value.(*Task).dependencies.Done()
 			}
-			d.start.Done()
+			d.StartGroup.Done()
 		}()
 
-		for _, predecessor := range predecessors {
+		for _, predecessor := range a.predecessors {
 			if fail(d.prepareInner(predecessor)) {
 				return
 			}

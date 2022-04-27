@@ -5,7 +5,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/help"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/input-output-hk/cicero-lib/dag"
+	"github.com/input-output-hk/tullia/dag"
 	"github.com/muesli/termenv"
 )
 

@@ -2,7 +2,6 @@ package dag
 
 import (
 	"bufio"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -14,7 +13,7 @@ import (
 	"time"
 
 	"github.com/c2h5oh/datasize"
-	"github.com/charmbracelet/lipgloss"
+	"github.com/goombaio/dag"
 	"github.com/pkg/errors"
 )
 
@@ -48,6 +47,8 @@ type Task struct {
 	err          error
 	stage        string
 	mut          *sync.Mutex
+	successors   []*dag.Vertex
+	predecessors []*dag.Vertex
 }
 
 func NewTask(name string) *Task {
@@ -71,15 +72,6 @@ func NewTask(name string) *Task {
 
 	return a
 }
-
-var (
-	stageWaitStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f0f"))
-	stageEvalStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#af0"))
-	stageBuildStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0"))
-	stageDoneStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#0f0"))
-	stageRunStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#0ff"))
-	stageErrorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#f00"))
-)
 
 func (a *Task) Name() string {
 	return a.name
@@ -111,46 +103,6 @@ func (a *Task) RSS() string {
 		}
 	}
 	return ""
-}
-
-func (a *Task) String() string {
-	var stage string
-	switch a.stage {
-	case "wait":
-		stage = stageWaitStyle.Render(a.stage)
-	case "eval":
-		stage = stageEvalStyle.Render(a.stage)
-	case "build":
-		stage = stageBuildStyle.Render(a.stage)
-	case "done":
-		stage = stageDoneStyle.Render(a.stage)
-	case "run":
-		stage = stageRunStyle.Render(a.stage)
-	case "error":
-		stage = stageErrorStyle.Render(a.stage)
-	default:
-		stage = a.stage
-	}
-
-	if a.err != nil {
-		stage = stageErrorStyle.Render(a.stage)
-		return fmt.Sprintf("%s %s %s", a.name, stage, a.err)
-	}
-
-	if a.cmd == nil {
-		return fmt.Sprintf("%s %s", a.name, stage)
-	} else if a.cmd.ProcessState != nil {
-		usage, ok := a.cmd.ProcessState.SysUsage().(*syscall.Rusage)
-		if ok {
-			rss := (datasize.ByteSize(usage.Maxrss) * datasize.KB).HumanReadable()
-			return fmt.Sprintf("%s %s (Max RSS: %s)", a.name, stage, rss)
-		} else {
-			return fmt.Sprintf("%s %s", a.name, stage)
-		}
-	} else if a.cmd.Process != nil {
-		return fmt.Sprintf("%s %s (PID: %d)", a.name, stage, a.cmd.Process.Pid)
-	}
-	return a.name
 }
 
 func (a *Task) Log(fromLine, lines int) []Line {

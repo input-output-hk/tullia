@@ -1,11 +1,13 @@
 {
   pkgs,
+  devShell,
   inputs,
   config,
   ...
 }: let
   name = "tullia/ci/lintAndBuild";
   start = inputs.start.value.${name}.start;
+  dependencies = devShell.nativeBuildInputs;
 in {
   action.${name} = {
     inputs.start = ''
@@ -27,23 +29,33 @@ in {
     };
 
     job.${name}.group.${name}.task = {
-      inherit (config.task) tidy lint build;
+      inherit (config.task) tidy lint build bump hello;
     };
   };
 
+  task.hello.command = "echo hello3";
+
   task.tidy = {
-    dependencies = with pkgs; [go gcc];
     command = "go mod tidy -v";
+    inherit dependencies;
+    env.USER = "bar";
   };
 
   task.lint = {
-    dependencies = with pkgs; [go golangci-lint gcc];
-    after = [config.task.tidy];
     command = "golangci-lint run";
+    after = [config.task.tidy];
+    inherit dependencies;
+  };
+
+  task.bump = {
+    command = "ruby bump.rb";
+    after = [config.task.tidy];
+    inherit dependencies;
   };
 
   task.build = {
-    after = [config.task.lint];
     command = "nix build";
+    after = [config.task.lint config.task.bump];
+    inherit dependencies;
   };
 }

@@ -1,4 +1,4 @@
-module github.com/input-output-hk/cicero-lib
+module github.com/input-output-hk/tullia
 
 go 1.17
 
@@ -13,6 +13,7 @@ require (
 	github.com/muesli/reflow v0.3.0
 	github.com/muesli/termenv v0.11.1-0.20220212125758-44cd13922739
 	github.com/pkg/errors v0.9.1
+	github.com/rs/zerolog v1.26.1
 )
 
 require (

@@ -6,7 +6,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/key"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/input-output-hk/cicero-lib/dag"
+	"github.com/input-output-hk/tullia/dag"
 )
 
 func (m *Model) Update(msgI tea.Msg) (tea.Model, tea.Cmd) {
@@ -58,7 +58,7 @@ func (m *Model) taskRetry() {
 }
 
 func (m *Model) moveCursor(n int) {
-	tasks := m.dag.Tasks()
+	tasks := m.dag.Tasks
 	nn := m.cursor + n
 	if nn >= len(tasks) {
 		nn = len(tasks) - 1
@@ -70,7 +70,7 @@ func (m *Model) moveCursor(n int) {
 }
 
 func (m *Model) getCursorItem() (*dag.Task, error) {
-	tasks := m.dag.Tasks()
+	tasks := m.dag.Tasks
 	if m.cursor < 0 || m.cursor >= len(tasks) {
 		return nil, errors.New("invalid cursor or empty list")
 	}

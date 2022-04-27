@@ -1,5 +1,5 @@
 {
-  description = "Cicero Library";
+  description = "Tullia - the hero Cicero deserves";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
@@ -16,51 +16,46 @@
     nix,
     nix2container,
     ...
-  } @ inputs:
-    (utils.lib.eachSystem ["x86_64-linux"] (system: let
-      pkgs = import nixpkgs {
-        inherit system;
-        overlays = [
-          (final: prev: {
-            nix = nix.packages.${system}.nix;
-            inherit (nix2container.packages.x86_64-linux.nix2container) buildImage buildLayer pullImage;
-            skopeo = nix2container.packages.x86_64-linux.skopeo-nix2container;
-            nsjail = prev.nsjail.overrideAttrs (o: {
-              version = "3.1";
-              src = prev.fetchFromGitHub {
-                owner = "google";
-                repo = "nsjail";
-                rev = "3.1";
-                fetchSubmodules = true;
-                sha256 = "sha256-ICJpD7iCT7tLRX+52XvayOUuO1g0L0jQgk60S2zLz6c=";
-              };
-              patches = [];
-            });
-            tullia = prev.callPackage ./nix/package.nix {flake = self;};
-          })
+  } @ inputs: let
+    system = "x86_64-linux";
+    pkgs = import nixpkgs {
+      inherit system;
+      overlays = [
+        (final: prev: {
+          nix = nix.packages.${system}.nix;
+          inherit (nix2container.packages.x86_64-linux.nix2container) buildImage buildLayer pullImage;
+          skopeo = nix2container.packages.x86_64-linux.skopeo-nix2container;
+          tullia = prev.callPackage ./nix/package.nix {flake = self;};
+        })
+      ];
+    };
+
+    devShell = with pkgs;
+      mkShell {
+        nativeBuildInputs = [
+          alejandra
+          go
+          gocode
+          golangci-lint
+          gopls
+          gotools
+          pkgs.nix
+          nsjail
+          ruby
+          gcc
         ];
       };
 
-      lib = import ./nix/lib.nix {inherit pkgs;};
+    lib = import ./nix/lib.nix {inherit pkgs devShell;};
+  in
+    (utils.lib.eachSystem ["x86_64-linux"] (system: let
     in {
-      devShell = with pkgs;
-        mkShell {
-          nativeBuildInputs = [
-            alejandra
-            go
-            gocode
-            golangci-lint
-            gopls
-            gotools
-            nix
-            nsjail
-          ];
-        };
-
-      defaultPackage = pkgs.tullia;
-
+      inherit devShell;
       inherit (lib.evalTasks [./nix/ci.nix]) dag task;
-      ciceroActions = lib.evalActions [./nix/ci.nix];
+      defaultPackage = pkgs.tullia;
     }))
-    // {nixosModules.tullia = import ./nix/module.nix;};
+    // {
+      nixosModules.tullia = import ./nix/module.nix;
+      ciceroActions = lib.evalActions [./nix/ci.nix];
+    };
 }

@@ -7,13 +7,15 @@ import (
 
 	arg "github.com/alexflint/go-arg"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/input-output-hk/cicero-lib/dag"
+	"github.com/input-output-hk/tullia/dag"
 )
 
 type Config struct {
-	Flake  string `arg:"-f,--flake"`
-	System string `arg:"--system"`
-	Task   string `arg:"positional"`
+	Flake   string `arg:"--flake"`
+	System  string `arg:"--system"`
+	Task    string `arg:"positional"`
+	Mode    string `arg:"--mode"`
+	Runtime string `arg:"--runtime"`
 }
 
 func (c Config) FlakeAttr() string {
@@ -21,8 +23,15 @@ func (c Config) FlakeAttr() string {
 }
 
 func main() {
-	config := Config{Flake: ".", Task: "", System: currentSystem()}
+	config := Config{Flake: ".", Task: "", System: currentSystem(), Mode: "cli", Runtime: "nsjail"}
 	arg.MustParse(&config)
+
+	if sv, err := supervisor(config); err != nil {
+		panic(err)
+	} else if err := sv.start(); err != nil {
+		panic(err)
+	}
+	os.Exit(0)
 
 	dag, err := dag.New(config.FlakeAttr())
 	if err != nil {
@@ -50,4 +59,11 @@ func currentSystem() string {
 		os.Exit(1)
 	}
 	return string(out)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
