@@ -5,11 +5,10 @@
   config,
   ...
 }: let
-  name = "tullia/ci/lintAndBuild";
-  start = inputs.start.value.${name}.start;
+  start = inputs.start.value."tullia/ci".start;
   dependencies = devShell.nativeBuildInputs;
 in {
-  action.${name} = {
+  action."tullia/ci/lintAndBuild" = {
     inputs.start.match = ''
       "tullia/ci": start: {
         clone_url: string
@@ -28,7 +27,7 @@ in {
       default_branch = start.default_branch or null;
     };
 
-    job.${name}.group.${name}.task = {
+    job.tullia-ci.group.ci.task = {
       inherit (config.task) tidy lint build bump;
     };
   };

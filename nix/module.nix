@@ -1012,15 +1012,6 @@
       job = mkOption {
         type = attrsOf jobType;
       };
-
-      task = mkOption {
-        type = attrsOf taskType;
-        default = {};
-      };
-    };
-
-    config = {
-      job.${name}.group.${name}.task = lib.mkIf (config.task != {}) config.task;
     };
   });
 in {
