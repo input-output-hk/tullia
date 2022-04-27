@@ -981,7 +981,28 @@
   }: {
     options = {
       inputs = mkOption {
-        type = attrsOf anything;
+        type = attrsOf (submodule {
+          options = {
+            match = mkOption {
+              type = str;
+            };
+
+            not = mkOption {
+              type = bool;
+              default = false;
+            };
+
+            optional = mkOption {
+              type = bool;
+              default = false;
+            };
+
+            select = mkOption {
+              type = str;
+              default = "latest";
+            };
+          };
+        });
       };
 
       output = mkOption {

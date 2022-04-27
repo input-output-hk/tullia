@@ -10,7 +10,7 @@
   dependencies = devShell.nativeBuildInputs;
 in {
   action.${name} = {
-    inputs.start = ''
+    inputs.start.match = ''
       "tullia/ci": start: {
         clone_url: string
         sha: string
@@ -29,11 +29,9 @@ in {
     };
 
     job.${name}.group.${name}.task = {
-      inherit (config.task) tidy lint build bump hello;
+      inherit (config.task) tidy lint build bump;
     };
   };
-
-  task.hello.command = "echo hello3";
 
   task.tidy = {
     command = "go mod tidy -v";
