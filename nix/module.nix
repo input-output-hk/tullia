@@ -6,9 +6,17 @@
 }: let
   inherit (lib) mkOption;
   inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything;
+  inherit (builtins) concatStringsSep filter isString split toJSON typeOf;
 
   pp2 = a: b: __trace (__toJSON a) b;
   pp = a: __trace (__toJSON a) a;
+
+  sanitizeServiceName = name:
+    lib.pipe name [
+      (split "[^[:alnum:]-]+")
+      (filter isString)
+      (concatStringsSep "-")
+    ];
 
   getImageName = image:
     lib.fileContents (pkgs.runCommand "imageName" {} ''
@@ -25,7 +33,7 @@
       {
         rootPaths = {
           inherit script;
-          env = pkgs.writeTextDir "nix-support/env" (builtins.toJSON env);
+          env = pkgs.writeTextDir "nix-support/env" (toJSON env);
         };
       };
     content = lib.fileContents "${closure}/store-paths";
@@ -158,7 +166,6 @@
       after = mkOption {
         type = listOf attrs;
         default = [];
-        apply = map (a: a.name);
       };
 
       command = mkOption {
@@ -238,7 +245,7 @@
               default = pkgs.writeShellApplication {
                 inherit (task) name;
                 text = (
-                  if builtins.typeOf task.command == "string"
+                  if typeOf task.command == "string"
                   then ''
                     set -x
                     ${task.command}
@@ -537,6 +544,9 @@
           options = {
             run = mkOption {
               type = package;
+              description = ''
+                Copy the task to local podman and execute it
+              '';
               default = let
                 flags = {
                   v = [
@@ -587,6 +597,9 @@
           options = {
             run = mkOption {
               type = package;
+              description = ''
+                Execute the task in a nsjail sandbox
+              '';
               default = let
                 c = config.nsjail;
 
@@ -684,7 +697,7 @@
               default =
                 pkgs.writeShellScriptBin config.name
                 (
-                  if builtins.typeOf config.command == "string"
+                  if typeOf config.command == "string"
                   then ''
                     [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
                     ${config.command}
@@ -897,6 +910,9 @@
           options = {
             run = mkOption {
               type = package;
+              description = ''
+                Simply run the task without any container
+              '';
               default = pkgs.writeShellApplication {
                 name = "${task.name}-impure";
                 runtimeInputs = task.dependencies;
@@ -978,8 +994,15 @@
     name,
     config,
     ...
-  }: {
+  }: let
+    action = config;
+  in {
     options = {
+      name = mkOption {
+        type = str;
+        default = name;
+      };
+
       inputs = mkOption {
         type = attrsOf (submodule {
           options = {
@@ -1011,6 +1034,7 @@
 
       job = mkOption {
         type = attrsOf jobType;
+        default = {};
       };
     };
   });
@@ -1038,6 +1062,6 @@ in {
   };
 
   config = {
-    dag = lib.mapAttrs (name: task: task.after) config.task;
+    dag = lib.mapAttrs (name: task: map (a: a.name) task.after) config.task;
   };
 }

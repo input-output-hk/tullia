@@ -47,11 +47,13 @@
       };
 
     lib = import ./nix/lib.nix {inherit pkgs devShell;};
+    tasks = lib.evalTasks [./nix/ci.nix];
   in
     (utils.lib.eachSystem ["x86_64-linux"] (system: let
     in {
       inherit devShell;
-      inherit (lib.evalTasks [./nix/ci.nix]) dag task;
+      inherit (tasks) dag;
+      task = lib.mapAttrs (name: task: task // {after = map (a: a.name) task.after;}) tasks.tasks.task;
       defaultPackage = pkgs.tullia;
     }))
     // {

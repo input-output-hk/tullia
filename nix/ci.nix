@@ -27,9 +27,28 @@ in {
       default_branch = start.default_branch or null;
     };
 
-    job.tullia-ci.group.ci.task = {
-      inherit (config.task) tidy lint build bump;
-    };
+    # task = config.task.build;
+
+    job.foo.group.foo.task.foo = config.task.tullia;
+
+    # config = let
+    #   sname = sanitizeServiceName action.name;
+    # in {
+    #   job = lib.mkIf (action.task != null) {
+    #     "${sname}".group.tullia.task.tullia = {
+    #       command = "${pkgs.tullia}/bin/tullia --flake /repo --task ${action.task.name}";
+    #     };
+    #   };
+    # };
+  };
+
+  task.tullia = {
+    dependencies = with pkgs; [tullia];
+    command = ''
+      cp -r ${../.} /repo
+      chmod u+w -R /repo
+      tullia --flake /repo --runtime impure --task build
+    '';
   };
 
   task.tidy = {

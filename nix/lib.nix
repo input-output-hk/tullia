@@ -1,6 +1,8 @@
-{pkgs, ...} @ args: {
+{pkgs, ...} @ args: let
+  inherit (pkgs.lib) evalModules filterAttrs mapAttrs;
+in {
   evalActions = modules: let
-    actionModule = pkgs.lib.evalModules {
+    actionModule = evalModules {
       modules =
         [
           {
@@ -17,6 +19,7 @@
       inputs,
       ...
     }:
+      filterAttrs (n: v: n != "task")
       (actionModule.extendModules {
         prefix = [];
         modules = [{_module.args = {inherit name id inputs;};}];
@@ -25,10 +28,10 @@
       .action
       .${name};
   in
-    pkgs.lib.mapAttrs (actionName: action: (evalAction actionName)) actionModule.config.action;
+    mapAttrs (actionName: action: (evalAction actionName)) actionModule.config.action;
 
   evalTasks = modules:
-    (pkgs.lib.evalModules {
+    (evalModules {
       modules =
         [
           {
