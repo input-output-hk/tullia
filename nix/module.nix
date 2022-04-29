@@ -618,44 +618,44 @@
                   )
                   options)}");
 
-                flags =
-                  (lib.optionalAttrs (c.cgroupV2Mount != null) {
-                    cgroupv2_mount = c.cgroupV2Mount;
-                  })
-                  // {
-                    quiet = c.quiet;
-                    verbose = c.verbose;
-                    time_limit = c.timeLimit;
-                    use_cgroupv2 = c.useCgroupV2;
-                    disable_clone_newnet = !c.cloneNewnet;
-                    rlimit_as = c.rlimit.as;
-                    rlimit_core = c.rlimit.core;
-                    rlimit_cpu = c.rlimit.cpu;
-                    rlimit_fsize = c.rlimit.fsize;
-                    rlimit_nofile = c.rlimit.nofile;
-                    rlimit_nproc = c.rlimit.nproc;
-                    rlimit_stack = c.rlimit.stack;
-                    cgroup_cpu_ms_per_sec = c.cgroup.cpuMsPerSec;
-                    cgroup_mem_max = c.cgroup.memMax;
-                    cgroup_net_cls_classid = c.cgroup.netClsClassid;
-                    cgroup_pids_max = c.cgroup.pidsMax;
-                    skip_setsid = !c.setsid;
-                    cwd = c.cwd;
-                    bindmount = c.bindmount.rw;
-                    bindmount_ro = c.bindmount.ro;
-                    mount = toMountFlag c.mount;
-                    env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") config.env;
-                  };
+                flags = {
+                  quiet = c.quiet;
+                  verbose = c.verbose;
+                  time_limit = c.timeLimit;
+                  disable_clone_newnet = !c.cloneNewnet;
+                  rlimit_as = c.rlimit.as;
+                  rlimit_core = c.rlimit.core;
+                  rlimit_cpu = c.rlimit.cpu;
+                  rlimit_fsize = c.rlimit.fsize;
+                  rlimit_nofile = c.rlimit.nofile;
+                  rlimit_nproc = c.rlimit.nproc;
+                  rlimit_stack = c.rlimit.stack;
+                  cgroup_cpu_ms_per_sec = c.cgroup.cpuMsPerSec;
+                  cgroup_mem_max = c.cgroup.memMax;
+                  cgroup_net_cls_classid = c.cgroup.netClsClassid;
+                  cgroup_pids_max = c.cgroup.pidsMax;
+                  skip_setsid = !c.setsid;
+                  cwd = c.cwd;
+                  bindmount = c.bindmount.rw;
+                  bindmount_ro = c.bindmount.ro;
+                  mount = toMountFlag c.mount;
+                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") config.env;
+                };
               in
                 pkgs.writeShellApplication {
                   name = "${config.name}-nsjail";
                   runtimeInputs = with pkgs; [coreutils-full nsjail];
                   text = ''
                     # TODO: This is tied to systemd... find a way to make it cross-platform.
-                    uid="$(id -u)"
-                    gid="$(id -g)"
-                    export cgroupMount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
-                    export cgroupParent="user@$uid.service"
+                    uid="''${UID:-$(id -u)}"
+                    gid="''${GID:-$(id -g)}"
+
+                    cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
+                    if [ -d "$cgroupV2Mount" ]; then
+                      echo "Using cgroups v2"
+                    else
+                      unset cgroupV2Mount
+                    fi
 
                     alloc="''${alloc:-$(mktemp -d -t alloc.XXXXXXXXXX)}"
                     root="$(mktemp -d -t root.XXXXXXXXXX)"
@@ -678,15 +678,8 @@
                     nsjail -Mo ${toString (lib.cli.toGNUCommandLine {} flags)} \
                       --user "$uid" \
                       --group "$gid" \
-                      --cgroupv2_mount "$cgroupMount" \
-                      --cgroup_cpu_mount "$cgroupMount" \
-                      --cgroup_mem_mount "$cgroupMount" \
-                      --cgroup_net_cls_mount "$cgroupMount" \
-                      --cgroup_pids_mount "$cgroupMount" \
-                      --cgroup_cpu_parent "$cgroupParent" \
-                      --cgroup_mem_parent "$cgroupParent" \
-                      --cgroup_net_cls_parent "$cgroupParent" \
-                      --cgroup_pids_parent "$cgroupParent" \
+                      ''${cgroupV2Mount:+--use_cgroupv2} \
+                      ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
                       -- ${lib.escapeShellArg "${c.innerScript}/bin/${config.name}"}
                   '';
                 };
@@ -729,16 +722,6 @@
             timeLimit = mkOption {
               type = ints.unsigned;
               default = 0;
-            };
-
-            useCgroupV2 = mkOption {
-              type = bool;
-              default = true;
-            };
-
-            cgroupV2Mount = mkOption {
-              type = nullOr str;
-              default = null;
             };
 
             cloneNewnet = mkOption {
