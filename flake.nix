@@ -53,7 +53,7 @@
     in {
       inherit devShell;
       inherit (tasks) dag;
-      task = lib.mapAttrs (name: task: task // {after = map (a: a.name) task.after;}) tasks.tasks.task;
+      task = pkgs.lib.mapAttrs (name: task: task // {after = map (a: a.name) task.after;}) tasks.task;
       defaultPackage = pkgs.tullia;
     }))
     // {
