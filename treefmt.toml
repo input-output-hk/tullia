@@ -6,3 +6,7 @@ includes = ["*.go"]
 [formatter.nix]
 command = "alejandra"
 includes = ["*.nix"]
+
+[formatter.cue]
+command = "treefmt-cue"
+includes = ["*.cue"]

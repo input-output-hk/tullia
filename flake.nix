@@ -6,58 +6,108 @@
     utils.url = "github:kreisys/flake-utils";
     nix.url = "github:NixOS/nix/2.8.0";
     nix2container.url = "github:nlewo/nix2container";
-    inclusive.url = "github:input-output-hk/nix-inclusive";
+    std.url = "github:divnix/std";
+    # std.url = "path:/home/manveru/github/divnix/std";
   };
 
-  outputs = {
-    self,
-    nixpkgs,
-    utils,
-    nix,
-    nix2container,
-    ...
-  } @ inputs: let
-    system = "x86_64-linux";
-    pkgs = import nixpkgs {
-      inherit system;
-      overlays = [
-        (final: prev: {
-          nix = nix.packages.${system}.nix;
-          inherit (nix2container.packages.x86_64-linux.nix2container) buildImage buildLayer pullImage;
-          skopeo = nix2container.packages.x86_64-linux.skopeo-nix2container;
-          tullia = prev.callPackage ./nix/package.nix {flake = self;};
-        })
+  outputs = inputs: let
+    pp = a: pp2 a a;
+    pp2 = a: b: builtins.trace (builtins.toJSON a) b;
+    cicero = name: {
+      inherit name;
+      clade = "cicero";
+      actions = {
+        system,
+        flake,
+        fragment,
+        fragmentRelPath,
+        cell,
+      }: let
+        pkgs = inputs.nixpkgs.legacyPackages.${system};
+        inherit (pkgs) lib;
+        escape = lib.escapeShellArg;
+        fragmentParts = lib.splitString "/" fragmentRelPath;
+        name = lib.last fragmentParts;
+        organelle = lib.elemAt fragmentParts (lib.length fragmentParts - 2);
+
+        tulliaFlake = inputs.self;
+        tullia = inputs.self.defaultPackage.${system};
+
+        n2cFlake = inputs.nix2container;
+        n2c = n2cFlake.packages.${system}.nix2container;
+        inherit (n2c) buildImage;
+
+        evaluated =
+          (lib.evalModules {
+            modules = [
+              {
+                _module.args = {
+                  pkgs = pkgs // {inherit tullia buildImage;};
+                  rootDir = flake;
+                };
+                task = cell.${organelle};
+              }
+              (tulliaFlake + /nix/module.nix)
+            ];
+          })
+          .config;
+
+        dag = evaluated.dag;
+        nsjails =
+          lib.mapAttrs (
+            n: v: let
+              g = evaluated.generatedTask."tullia-${n}";
+            in "${g.nsjail.run}/bin/tullia-${n}-nsjail"
+          )
+          evaluated.task;
+
+        spec = lib.escapeShellArg (builtins.toJSON {
+          dag = {"${name}" = [];};
+          bin = nsjails;
+        });
+      in [
+        {
+          name = "nsjail";
+          description = "run this task in nsjail";
+          command =
+            []
+            ++ ["go" "run" "./cli"]
+            ++ ["--run-spec" spec]
+            ++ ["--mode" "passthrough"]
+            ++ ["--runtime" "nsjail"]
+            ++ [(lib.escapeShellArg name)];
+        }
       ];
     };
-
-    devShell = with pkgs;
-      mkShell {
-        nativeBuildInputs = [
-          alejandra
-          go
-          gocode
-          golangci-lint
-          gopls
-          gotools
-          pkgs.nix
-          nsjail
-          ruby
-          gcc
-        ];
-      };
-
-    lib = import ./nix/lib.nix {inherit pkgs devShell;};
-    tasks = lib.evalTasks [./nix/ci.nix];
+    # {
+    #   name = "nsjail";
+    #   description = "run this task in nsjail";
+    #   command = ["${task.nsjail.run}/bin/tullia-${name}-nsjail"];
+    # }
+    # {
+    #   name = "podman";
+    #   description = "run this task in podman";
+    #   command = ["${task.podman.run}/bin/tullia-${name}-podman"];
+    # }
   in
-    (utils.lib.eachSystem ["x86_64-linux"] (system: let
-    in {
-      inherit devShell;
-      inherit (tasks) dag;
-      task = pkgs.lib.mapAttrs (name: task: task // {after = map (a: a.name) task.after;}) tasks.task;
-      defaultPackage = pkgs.tullia;
-    }))
-    // {
-      nixosModules.tullia = import ./nix/module.nix;
-      ciceroActions = lib.evalActions [./nix/ci.nix];
-    };
+    inputs.std.growOn {
+      inherit inputs;
+      cellsFrom = ./cells;
+      organelles = [
+        (inputs.std.functions "library")
+        (cicero "task")
+        (inputs.std.devshells "devshell")
+        (inputs.std.installables "apps")
+      ];
+    }
+    (
+      let
+        gather = f: inputs.nixpkgs.lib.mapAttrs (n: v: f v) inputs.self;
+      in {
+        devShell = gather (v: v.tullia.devshell.default);
+        # task = gather (v: v.tullia.library.task);
+        # dag = gather (v: v.tullia.library.dag);
+        defaultPackage = gather (v: v.tullia.apps.tullia);
+      }
+    );
 }

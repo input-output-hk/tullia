@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"sync"
 	"syscall"
@@ -53,12 +54,18 @@ func (t *Task) prepare(prepareWG, startWG *sync.WaitGroup) error {
 		go func() {
 			defer startWG.Done()
 			prepareWG.Wait()
-			if t.fail(t.eval()) {
-				return
+
+			if t.config.runSpec == nil {
+				if t.fail(t.eval()) {
+					return
+				}
+				if t.fail(t.build()) {
+					return
+				}
+			} else {
+				t.storePath = t.config.runSpec.Bin[t.name]
 			}
-			if t.fail(t.build()) {
-				return
-			}
+
 			t.dependencies.Wait()
 			if t.dependencyFailed() {
 				return
@@ -99,7 +106,24 @@ func (t *Task) preExec(stage string) {
 		t.preExecJSON()
 	case "cli":
 		t.preExecCLI()
+	case "verbose":
+		t.preExecVerbose()
+	case "passthrough":
+		t.preExecPassthrough()
+	default:
+		panic("Unknown mode " + t.config.Mode)
 	}
+}
+
+func (t *Task) preExecVerbose() {
+	t.log.Debug().Stringer("cmd", t.cmd).Msg("start")
+	log := t.log.
+		Output(zerolog.ConsoleWriter{Out: os.Stderr}).
+		With().
+		Str("level", zerolog.LevelInfoValue).
+		Timestamp()
+	t.cmd.Stdout = log.Str("std", "out").Logger()
+	t.cmd.Stderr = log.Str("std", "err").Logger()
 }
 
 func (t *Task) preExecCLI() {
@@ -108,9 +132,16 @@ func (t *Task) preExecCLI() {
 	t.cmd.Stderr = t.cliLines
 }
 
+func (t *Task) preExecPassthrough() {
+	t.cmd.Stdout = os.Stdout
+	t.cmd.Stderr = os.Stderr
+	t.cmd.Stdin = os.Stdin
+	t.cmd.Env = os.Environ()
+}
+
 func (t *Task) preExecJSON() {
 	t.log.Debug().Stringer("cmd", t.cmd).Msg("start")
-	log := t.log.With().Str("level", zerolog.DebugLevel.String())
+	log := t.log.With().Str("level", zerolog.LevelDebugValue)
 	t.cmd.Stdout = log.Str("std", "out").Logger()
 	t.cmd.Stderr = log.Str("std", "err").Logger()
 }
@@ -131,7 +162,11 @@ func (t *Task) exec(stage string, f func()) error {
 	case "json":
 		return t.execJSON(stage, f, err)
 	case "cli":
-		return t.execCLI(stage, f, err)
+		return t.execCommon(stage, f, err)
+	case "verbose":
+		return t.execCommon(stage, f, err)
+	case "passthrough":
+		return t.execCommon(stage, f, err)
 	default:
 		return fmt.Errorf("unknown mode %q", t.config.Mode)
 	}
@@ -149,7 +184,7 @@ func (t *Task) execJSON(stage string, f func(), err error) error {
 	}
 }
 
-func (t *Task) execCLI(stage string, f func(), err error) error {
+func (t *Task) execCommon(stage string, f func(), err error) error {
 	if err != nil {
 		return errors.WithMessagef(err, "Failed to run %s", t.cmd)
 	} else {
@@ -180,22 +215,24 @@ func (t *Task) fail(err error) bool {
 
 func (t *Task) eval() error {
 	t.cmd = exec.Command("nix", "eval", "--raw",
-		t.config.Flake+"#task."+currentSystem()+"."+t.name+"."+t.config.Runtime+".run.outPath")
+		t.config.TaskFlake+"."+t.name+"."+t.config.Runtime+".run.outPath")
 	t.preExec("eval")
 	buf := &bytes.Buffer{}
 	t.cmd.Stdout = buf
-	return t.exec("wait", func() { t.storePath = buf.String() })
+	return t.exec("wait", func() {
+		t.storePath = buf.String() + "/bin/" + t.name + "-" + t.config.Runtime
+	})
 }
 
 func (t *Task) build() error {
 	t.cmd = exec.Command("nix", "build", "--no-link",
-		t.config.Flake+"#task."+currentSystem()+"."+t.name+"."+t.config.Runtime+".run")
+		t.config.TaskFlake+"."+t.name+"."+t.config.Runtime+".run")
 	t.preExec("build")
 	return t.exec("wait", func() {})
 }
 
 func (t *Task) run() error {
-	t.cmd = exec.Command(string(t.storePath) + "/bin/" + t.name + "-" + t.config.Runtime)
+	t.cmd = exec.Command(t.storePath)
 	t.preExec("run")
 	t.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return t.exec("done", func() {})

@@ -24,16 +24,16 @@ func waitForContext(ctx context.Context) tea.Cmd {
 	}
 }
 
-type spinMsg time.Time
+type refreshMsg time.Time
 
-func spin() tea.Cmd {
+func refresh() tea.Cmd {
 	return func() tea.Msg {
-		return spinMsg(<-time.After(33 * time.Millisecond))
+		return refreshMsg(<-time.After(33 * time.Millisecond))
 	}
 }
 
 func (m *CLIModel) Init() tea.Cmd {
-	return tea.Batch(spin(), waitForContext(m.ctx))
+	return tea.Batch(refresh(), waitForContext(m.ctx))
 }
 
 func (m *CLIModel) Update(recv tea.Msg) (tea.Model, tea.Cmd) {
@@ -45,8 +45,8 @@ func (m *CLIModel) Update(recv tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case contextMsg:
 		return m, tea.Quit
-	case spinMsg:
-		return m, spin()
+	case refreshMsg:
+		return m, refresh()
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 	}
@@ -62,6 +62,7 @@ var (
 )
 
 func (m *CLIModel) View() string {
+	taskNameLen := 0
 	tasks := map[string]*Task{}
 	for _, taskName := range m.tree.taskNames {
 		vert, err := m.tree.dag.GetVertex(taskName)
@@ -69,6 +70,9 @@ func (m *CLIModel) View() string {
 			panic(err)
 		}
 		tasks[taskName] = vert.Value.(*Task)
+		if len(taskName) > taskNameLen {
+			taskNameLen = len(taskName)
+		}
 	}
 
 	styleLine := lipgloss.NewStyle().Width(m.width).MaxWidth(m.width)
@@ -123,7 +127,8 @@ func (m *CLIModel) View() string {
 		}
 
 		timestamp := styleDuration.Render(durationOut)
-		styleLeft := lipgloss.NewStyle().Width(m.width - (lipgloss.Width(timestamp)))
+		width := min(m.width-lipgloss.Width(timestamp), taskNameLen+5)
+		styleLeft := lipgloss.NewStyle().Width(width)
 
 		lines = append(lines, styleLine.Foreground(color).Render(
 			lipgloss.JoinHorizontal(

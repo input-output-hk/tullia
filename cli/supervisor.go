@@ -20,7 +20,7 @@ func supervisor(config Config) (*Supervisor, error) {
 		New(zerolog.NewConsoleWriter()).
 		With().
 		Timestamp().
-		Str("flake", config.Flake).Logger()
+		Logger()
 
 	if tree, err := newTree(log, config); err != nil {
 		return nil, err
@@ -35,18 +35,25 @@ func (s *Supervisor) start() error {
 		return nil
 	case "cli":
 		return s.startCLI()
+	case "verbose":
+		return s.startVerbose()
+	case "passthrough":
+		return s.startVerbose()
 	default:
-		return s.tree.start()
+		return fmt.Errorf("Unknown mode: %q", s.config.Mode)
+		// return s.tree.start()
 	}
 }
 
 func (s *Supervisor) startCLI() error {
+	if err := s.tree.prepare(s.config.Task); err != nil {
+		return err
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 
 	go func() {
-		if err := s.tree.start(); err != nil {
-			panic(err)
-		}
+		s.tree.start()
 		cancel()
 	}()
 
@@ -54,6 +61,16 @@ func (s *Supervisor) startCLI() error {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+
+	return nil
+}
+
+func (s *Supervisor) startVerbose() error {
+	if err := s.tree.prepare(s.config.Task); err != nil {
+		return err
+	}
+
+	s.tree.start()
 
 	return nil
 }

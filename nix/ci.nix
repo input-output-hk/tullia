@@ -27,19 +27,7 @@ in {
       default_branch = start.default_branch or null;
     };
 
-    # task = config.task.build;
-
     job.foo.group.foo.task.foo = config.task.tullia;
-
-    # config = let
-    #   sname = sanitizeServiceName action.name;
-    # in {
-    #   job = lib.mkIf (action.task != null) {
-    #     "${sname}".group.tullia.task.tullia = {
-    #       command = "${pkgs.tullia}/bin/tullia --flake /repo --task ${action.task.name}";
-    #     };
-    #   };
-    # };
   };
 
   task.tullia = {

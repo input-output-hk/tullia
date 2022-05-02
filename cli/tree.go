@@ -26,11 +26,10 @@ type Tree struct {
 
 func newTree(log zerolog.Logger, config Config) (*Tree, error) {
 	tree := &Tree{
-		log:       log,
-		prepareWG: &sync.WaitGroup{},
-		startWG:   &sync.WaitGroup{},
-		dag:       dag.NewDAG(),
-		config:    config,
+		log:     log,
+		startWG: &sync.WaitGroup{},
+		dag:     dag.NewDAG(),
+		config:  config,
 	}
 	if err := tree.eval(); err != nil {
 		return tree, err
@@ -44,28 +43,31 @@ func newTree(log zerolog.Logger, config Config) (*Tree, error) {
 	return tree, nil
 }
 
-func (t *Tree) start() error {
-	t.prepareWG.Add(1)
-	if err := t.prepare(t.config.Task); err != nil {
-		return err
+func (t *Tree) start() {
+	if t.prepareWG == nil {
+		panic("Tried to start without calling prepare first")
 	}
 	t.prepareWG.Done()
 	t.startWG.Wait()
-	return nil
 }
 
 func (t *Tree) eval() error {
-	cmd := exec.Command("nix", "eval", "--json", t.config.Flake+"#dag."+currentSystem())
-	cmd.Stderr = os.Stderr
+	if t.config.runSpec == nil {
+		cmd := exec.Command("nix", "eval", "--json", t.config.DagFlake)
+		cmd.Stderr = os.Stderr
 
-	dagResult := map[string][]string{}
-	if output, err := cmd.Output(); err != nil {
-		return errors.WithMessage(err, "running eval")
-	} else if err := json.Unmarshal(output, &dagResult); err != nil {
-		return errors.WithMessage(err, "parsing eval result")
+		dagResult := map[string][]string{}
+		if output, err := cmd.Output(); err != nil {
+			return errors.WithMessage(err, "running eval")
+		} else if err := json.Unmarshal(output, &dagResult); err != nil {
+			fmt.Println(string(output))
+			return errors.WithMessage(err, "parsing eval result")
+		}
+
+		t.dagResult = dagResult
+	} else {
+		t.dagResult = t.config.runSpec.Dag
 	}
-
-	t.dagResult = dagResult
 
 	return nil
 }
@@ -126,6 +128,9 @@ func (t *Tree) populateRelations() error {
 }
 
 func (t *Tree) prepare(taskName string) error {
+	t.prepareWG = &sync.WaitGroup{}
+	t.prepareWG.Add(1)
+
 	root, err := t.dag.GetVertex(taskName)
 	if err != nil {
 		if err.Error() == fmt.Sprintf("vertex %s not found in the graph", taskName) {

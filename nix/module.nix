@@ -2,10 +2,11 @@
   lib,
   pkgs,
   config,
+  rootDir,
   ...
 }: let
   inherit (lib) mkOption;
-  inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything;
+  inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything strMatching;
   inherit (builtins) concatStringsSep filter isString split toJSON typeOf;
 
   pp2 = a: b: __trace (__toJSON a) b;
@@ -18,11 +19,15 @@
       (concatStringsSep "-")
     ];
 
-  getImageName = image:
-    lib.fileContents (pkgs.runCommand "imageName" {} ''
-      ls ${image}
-      echo "${image.imageName}:${image.imageTag}" > $out
-    '');
+  getImageName = image: "${image.imageName}:${image.imageTag}";
+  /*
+   image:
+   lib.fileContents (pkgs.runCommand "imageName" {} ''
+     echo "${image.imageName}:${image.imageTag}" > $out
+   '');
+   */
+
+  moduleConfig = config;
 
   getClosure = {
     script,
@@ -77,6 +82,7 @@
         HOME = "/local";
         NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         PATH = lib.makeBinPath config.dependencies;
+        TERM = "xterm-256color";
         # TODO: real options for this?
         NIX_CONFIG = ''
           experimental-features = ca-derivations flakes nix-command
@@ -164,7 +170,7 @@
   in {
     options = {
       after = mkOption {
-        type = listOf attrs;
+        type = listOf str;
         default = [];
       };
 
@@ -193,7 +199,7 @@
       };
 
       name = mkOption {
-        type = str;
+        type = strMatching "^[[:alnum:]-]+$";
         default = name;
       };
 
@@ -651,9 +657,7 @@
                     gid="''${GID:-$(id -g)}"
 
                     cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
-                    if [ -d "$cgroupV2Mount" ]; then
-                      echo "Using cgroups v2"
-                    else
+                    if [ ! -d "$cgroupV2Mount" ]; then
                       unset cgroupV2Mount
                     fi
 
@@ -721,7 +725,7 @@
 
             timeLimit = mkOption {
               type = ints.unsigned;
-              default = 0;
+              default = 30;
             };
 
             cloneNewnet = mkOption {
@@ -899,7 +903,10 @@
               default = pkgs.writeShellApplication {
                 name = "${task.name}-impure";
                 runtimeInputs = task.dependencies;
-                text = task.command;
+                text = ''
+                  set -x
+                  ${task.command}
+                '';
               };
             };
           };
@@ -1017,9 +1024,19 @@
 
       job = mkOption {
         type = attrsOf jobType;
-        default = {};
+      };
+
+      task = mkOption {
+        type = nullOr str;
+        default = null;
       };
     };
+
+    config = lib.mkIf (action.task != null) (let
+      sname = sanitizeServiceName name;
+    in {
+      job.${sname}.group.tullia.task.tullia = moduleConfig.generatedTask."tullia-${action.task}";
+    });
   });
 in {
   options = {
@@ -1038,6 +1055,11 @@ in {
       type = attrsOf taskType;
     };
 
+    generatedTask = mkOption {
+      default = {};
+      type = attrsOf taskType;
+    };
+
     dag = mkOption {
       default = {};
       type = attrsOf anything;
@@ -1045,6 +1067,39 @@ in {
   };
 
   config = {
-    dag = lib.mapAttrs (name: task: map (a: a.name) task.after) config.task;
+    dag = lib.mapAttrs (name: task: task.after) config.task;
+
+    generatedTask = let
+      filtered =
+        lib.filterAttrs (
+          n: v:
+            (builtins.match "^tullia-.*" n) == null
+        )
+        config.task;
+
+      impureRunnables = lib.mapAttrs (n: v: "${v.impure.run}/bin/${n}-impure") filtered;
+
+      spec = lib.escapeShellArg (builtins.toJSON {
+        inherit (config) dag;
+        bin = impureRunnables;
+      });
+    in
+      lib.mapAttrs' (
+        n: v: {
+          name = "tullia-${n}";
+          value = {
+            dependencies = with pkgs; [tullia];
+            command = ''
+              if [ ! -d /repo ]; then
+                cp -r ${rootDir} /repo
+                chmod u+w -R /repo
+              fi
+              tullia --run-spec ${spec} --mode cli --runtime impure ${n}
+            '';
+            nsjail.setsid = true;
+          };
+        }
+      )
+      filtered;
   };
 }

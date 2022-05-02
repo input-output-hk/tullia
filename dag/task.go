@@ -197,7 +197,7 @@ func (a *Task) run() error {
 
 func (a *Task) eval() error {
 	a.stage = "eval"
-	eval := exec.Command("nix", "eval", "--raw", ".#task.x86_64-linux."+a.name+".run.outPath")
+	eval := exec.Command("nix", "eval", "--raw", ".#task."+a.name+".run.outPath")
 	eval.Stderr = a.stderrWr
 	storePath, err := eval.Output()
 	if err != nil {
@@ -211,7 +211,7 @@ func (a *Task) eval() error {
 // putting symlinks all over the place.
 func (a *Task) build() error {
 	a.stage = "build"
-	build := exec.Command("nix", "build", "--no-link", ".#task.x86_64-linux."+a.name+".run")
+	build := exec.Command("nix", "build", "--no-link", ".#task."+a.name+".run")
 	build.Stdout = a.stdoutWr
 	build.Stderr = a.stderrWr
 	if err := build.Run(); err != nil {
