@@ -67,6 +67,8 @@
 
   dependencies = with pkgs; [
     alejandra
+    fd
+    gcc
     go
     gocode
     golangci-lint
@@ -75,7 +77,6 @@
     inputs.nix2container.packages.skopeo-nix2container
     nsjail
     ruby
-    gcc
   ];
   # evaluated = evalTasks tasks;
 in {
