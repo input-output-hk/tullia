@@ -3,11 +3,8 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    utils.url = "github:kreisys/flake-utils";
-    nix.url = "github:NixOS/nix/2.8.0";
     nix2container.url = "github:nlewo/nix2container";
     std.url = "github:divnix/std";
-    # std.url = "path:/home/manveru/github/divnix/std";
   };
 
   outputs = inputs: let
