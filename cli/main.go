@@ -8,6 +8,9 @@ import (
 	arg "github.com/alexflint/go-arg"
 )
 
+var buildVersion = "dev"
+var buildCommit = "dirty"
+
 type RunSpec struct {
 	Dag map[string][]string `json:"dag"`
 	Bin map[string]string   `json:"bin"`
@@ -22,6 +25,14 @@ type Config struct {
 
 	RunSpec string `arg:"--run-spec"`
 	runSpec *RunSpec
+}
+
+func Version() string {
+	return fmt.Sprintf("%s (%s)", buildVersion, buildCommit)
+}
+
+func (Config) Version() string {
+	return fmt.Sprintf("cicero %s", Version())
 }
 
 func main() {

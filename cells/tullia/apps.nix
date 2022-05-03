@@ -5,7 +5,7 @@
   package = vendorSha256:
     inputs.nixpkgs.buildGoModule rec {
       pname = "tullia";
-      version = "2022.04.27.001";
+      version = "2022.05.03.001";
       inherit vendorSha256;
 
       passthru.invalidHash =
@@ -32,5 +32,5 @@
       ];
     };
 in {
-  tullia = package "sha256-molzDFfwierIXYgAZbQjB3QYiddy9yXDB5kw+aV9ePo=";
+  tullia = package "sha256-12n8Mr0rcPCsbHY0bnpTyXTc2ccVwO/66PiM8EpQxmc=";
 }

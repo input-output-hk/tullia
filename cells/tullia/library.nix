@@ -72,7 +72,6 @@
     golangci-lint
     gopls
     gotools
-    inputs.nix.packages.nix
     inputs.nix2container.packages.skopeo-nix2container
     nsjail
     ruby
