@@ -817,7 +817,7 @@
 
                   pidsMax = mkOption {
                     type = ints.unsigned;
-                    default = 1000;
+                    default = 0;
                     description = "Maximum number of pids in a cgroup. 0 is disabled";
                   };
 
