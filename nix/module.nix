@@ -771,7 +771,7 @@
                         storePaths
                         ;
                     in
-                      ["${closure}/registration:/registration"] ++ storePaths;
+                      ["${closure}/registration:/registration"] ++ storePaths ++ ["/etc/resolv.conf:/etc/resolv.conf"];
                   };
                 };
               };
