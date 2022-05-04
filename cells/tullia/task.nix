@@ -2,11 +2,11 @@
   cell,
   inputs,
 }: let
-  inherit (cell.library) dependencies;
+  pkgs = inputs.nixpkgs;
 in {
   tidy = {
     command = "go mod tidy -v";
-    inherit dependencies;
+    dependencies = with pkgs; [go gcc];
   };
 
   lint = {
@@ -17,18 +17,18 @@ in {
       echo linting nix...
       fd -e nix -X alejandra -q -c
     '';
-    inherit dependencies;
+    after = ["tidy"];
+    dependencies = with pkgs; [golangci-lint go gcc fd alejandra];
   };
 
   bump = {
     command = "ruby bump.rb";
-    after = ["tidy"];
-    inherit dependencies;
+    after = ["lint"];
+    dependencies = with pkgs; [ruby];
   };
 
   build = {
     command = "nix build";
-    after = ["tidy" "lint" "bump"];
-    inherit dependencies;
+    after = ["bump"];
   };
 }

@@ -563,8 +563,8 @@
                   ];
                   rmi = false;
                   rm = true;
-                  tty = true;
-                  interactive = true;
+                  # tty = false;
+                  # interactive = true;
                 };
                 imageName = getImageName config.oci.image;
               in
@@ -584,7 +584,11 @@
                     }
                     trap finish EXIT
                     copy-to containers-storage:${imageName}
-                    podman run ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
+                    if tty -s; then
+                      echo "" | exec podman run --tty ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
+                    else
+                      echo "" | exec podman run ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
+                    fi
                   '';
                 };
             };
@@ -1097,6 +1101,7 @@ in {
               tullia --run-spec ${spec} --mode cli --runtime impure ${n}
             '';
             nsjail.setsid = true;
+            oci.maxLayers = 30;
           };
         }
       )

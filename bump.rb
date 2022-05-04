@@ -35,7 +35,6 @@ if old_sha == new_sha
 else
   puts "Updating vendorSha256 #{old_sha} => #{new_sha}"
   updated = File.read(file).gsub(/#{Regexp.escape(old_sha)}/, new_sha)
-  puts updated
   File.write(file, updated)
 end
 

@@ -4,7 +4,6 @@ go 1.17
 
 require (
 	github.com/alexflint/go-arg v1.4.3
-	github.com/c2h5oh/datasize v0.0.0-20200825124411-48ed595a09d2
 	github.com/charmbracelet/bubbletea v0.20.0
 	github.com/charmbracelet/lipgloss v0.5.0
 	github.com/goombaio/dag v0.0.0-20181006234417-a8874b1f72ff

@@ -67,6 +67,8 @@
 
   dependencies = with pkgs; [
     alejandra
+    cell.apps.treefmt-cue
+    cue
     fd
     gcc
     go

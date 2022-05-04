@@ -10,7 +10,8 @@
   outputs = inputs: let
     pp = a: pp2 a a;
     pp2 = a: b: builtins.trace (builtins.toJSON a) b;
-    cicero = name: {
+
+    mkCicero = name: {
       inherit name;
       clade = "cicero";
       actions = {
@@ -22,89 +23,102 @@
       }: let
         pkgs = inputs.nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
-        escape = lib.escapeShellArg;
+        cmd = pkgs.writeShellApplication {
+          name = "cmd";
+          text = ''
+            echo name: ${lib.escapeShellArg name}
+            echo system: ${lib.escapeShellArg system}
+            echo flake: ${lib.escapeShellArg flake}
+            echo fragment: ${lib.escapeShellArg fragment}
+            echo fragmentRelPath: ${lib.escapeShellArg fragmentRelPath}
+            echo ${lib.escapeShellArg (__toJSON (__attrNames cell.${name}))}
+          '';
+        };
+        command = ["${cmd}/bin/cmd"];
+        dbg = [
+          {
+            name = "print";
+            description = "print";
+            inherit command;
+          }
+        ];
+      in [];
+    };
+
+    mkTullia = name: {
+      inherit name;
+      clade = "tullia";
+      actions = {
+        system,
+        flake,
+        fragment,
+        fragmentRelPath,
+        cell,
+      }: let
+        pkgs = inputs.nixpkgs.legacyPackages.${system};
+        inherit (pkgs) lib;
         fragmentParts = lib.splitString "/" fragmentRelPath;
-        name = lib.last fragmentParts;
-        organelle = lib.elemAt fragmentParts (lib.length fragmentParts - 2);
-
-        tulliaFlake = inputs.self;
+        taskName = lib.last fragmentParts;
         tullia = inputs.self.defaultPackage.${system};
-
-        n2cFlake = inputs.nix2container;
-        n2c = n2cFlake.packages.${system}.nix2container;
-        inherit (n2c) buildImage;
 
         evaluated =
           (lib.evalModules {
             modules = [
               {
                 _module.args = {
-                  pkgs = pkgs // {inherit tullia buildImage;};
+                  pkgs =
+                    pkgs
+                    // {
+                      tullia = inputs.self.defaultPackage.${system};
+                      inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
+                    };
                   rootDir = flake;
                 };
-                task = cell.${organelle};
+                task = cell.${name};
               }
-              (tulliaFlake + /nix/module.nix)
+              (inputs.self + /nix/module.nix)
             ];
           })
           .config;
 
-        dag = evaluated.dag;
-        nsjails =
-          lib.mapAttrs (
-            n: v: let
-              g = evaluated.generatedTask."tullia-${n}";
-            in "${g.nsjail.run}/bin/tullia-${n}-nsjail"
-          )
-          evaluated.task;
+        mkSpec = runtime: let
+          inherit (evaluated.generatedTask."tullia-${taskName}".${runtime}) run;
+        in (lib.escapeShellArg (builtins.toJSON {
+          dag = {"${taskName}" = [];};
+          bin = {${taskName} = "${run}/bin/tullia-${taskName}-${runtime}";};
+        }));
 
-        spec = lib.escapeShellArg (builtins.toJSON {
-          dag = {"${name}" = [];};
-          bin = nsjails;
-        });
-      in [
-        {
-          name = "nsjail";
-          description = "run this task in nsjail";
+        mkAction = runtime: {
+          name = runtime;
+          description = "run this task in ${runtime}";
           command =
             []
             ++ ["go" "run" "./cli"]
-            ++ ["--run-spec" spec]
+            ++ ["--run-spec" (mkSpec runtime)]
             ++ ["--mode" "passthrough"]
-            ++ ["--runtime" "nsjail"]
-            ++ [(lib.escapeShellArg name)];
-        }
-      ];
+            ++ ["--runtime" runtime]
+            ++ [(lib.escapeShellArg taskName)];
+        };
+
+        nsjailSpec = mkSpec "nsjail";
+        podmanSpec = mkSpec "podman";
+      in
+        map mkAction ["nsjail" "podman"];
     };
-    # {
-    #   name = "nsjail";
-    #   description = "run this task in nsjail";
-    #   command = ["${task.nsjail.run}/bin/tullia-${name}-nsjail"];
-    # }
-    # {
-    #   name = "podman";
-    #   description = "run this task in podman";
-    #   command = ["${task.podman.run}/bin/tullia-${name}-podman"];
-    # }
   in
     inputs.std.growOn {
       inherit inputs;
       cellsFrom = ./cells;
       organelles = [
         (inputs.std.functions "library")
-        (cicero "task")
+        (mkTullia "task")
+        (mkCicero "action")
         (inputs.std.devshells "devshell")
         (inputs.std.installables "apps")
       ];
     }
-    (
-      let
-        gather = f: inputs.nixpkgs.lib.mapAttrs (n: v: f v) inputs.self;
-      in {
-        devShell = gather (v: v.tullia.devshell.default);
-        # task = gather (v: v.tullia.library.task);
-        # dag = gather (v: v.tullia.library.dag);
-        defaultPackage = gather (v: v.tullia.apps.tullia);
-      }
-    );
+    {
+      devShell = inputs.std.harvest inputs.self ["tullia" "devshell" "default"];
+      defaultPackage = inputs.std.harvest inputs.self ["tullia" "apps" "tullia"];
+    };
 }
