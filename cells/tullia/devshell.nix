@@ -9,5 +9,6 @@
         ++ [
           inputs.std.std.cli.default
         ];
+      GOROOT = "${pkgs.go}/share/go";
     };
 }
