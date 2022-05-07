@@ -54,6 +54,7 @@ func (t *Task) prepare(prepareWG, startWG *sync.WaitGroup) error {
 		go func() {
 			defer startWG.Done()
 			prepareWG.Wait()
+			t.stage = "wait"
 
 			if t.config.runSpec == nil {
 				if t.fail(t.eval()) {

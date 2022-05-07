@@ -53,18 +53,22 @@ func (t *Tree) start() {
 
 func (t *Tree) eval() error {
 	if t.config.runSpec == nil {
-		cmd := exec.Command("nix", "eval", "--json", t.config.DagFlake)
-		cmd.Stderr = os.Stderr
+		if t.config.Mode == "passthrough" {
+			t.dagResult = map[string][]string{t.config.Task: {}}
+		} else {
+			cmd := exec.Command("nix", "eval", "--json", t.config.DagFlake)
+			cmd.Stderr = os.Stderr
 
-		dagResult := map[string][]string{}
-		if output, err := cmd.Output(); err != nil {
-			return errors.WithMessage(err, "running eval")
-		} else if err := json.Unmarshal(output, &dagResult); err != nil {
-			fmt.Println(string(output))
-			return errors.WithMessage(err, "parsing eval result")
+			dagResult := map[string][]string{}
+			if output, err := cmd.Output(); err != nil {
+				return errors.WithMessage(err, "running eval")
+			} else if err := json.Unmarshal(output, &dagResult); err != nil {
+				fmt.Println(string(output))
+				return errors.WithMessage(err, "parsing eval result")
+			}
+
+			t.dagResult = dagResult
 		}
-
-		t.dagResult = dagResult
 	} else {
 		t.dagResult = t.config.runSpec.Dag
 	}

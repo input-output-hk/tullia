@@ -29,18 +29,7 @@ func supervisor(config Config) (*Supervisor, error) {
 	}
 }
 
-func hasTTY() bool {
-	fi, _ := os.Stdin.Stat()
-
-	if (fi.Mode() & os.ModeCharDevice) == 0 {
-		return false
-	} else {
-		return true
-	}
-}
-
 func (s *Supervisor) start() error {
-	fmt.Println("tty:", hasTTY())
 	switch s.config.Mode {
 	case "json":
 		return nil

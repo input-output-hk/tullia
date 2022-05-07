@@ -1,17 +1,13 @@
-task: "build"
+package action
 
-input: "tullia/ci": start: {
-	clone_url:     string
-	sha:           string
-	statuses_url?: string
-
-	ref?:            "refs/heads/\(default_branch)"
-	default_branch?: string
+_lib: github: pull_request: {
+	#input:  "github"
+	#repo:   "input-output-hk/cicero"
+	#target: "main"
+	pull_request: base: repo: watchers: >10
 }
 
-output: success: {
-	ok:             true
-	revision:       start.sha
-	ref:            start.ref || null
-	default_branch: start.default_branch || null
+_lib: slack: message: {
+	#input: "slack"
+	#channels: ["foo"]
 }

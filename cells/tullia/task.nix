@@ -9,8 +9,9 @@ in {
     dependencies = with pkgs; [go gcc];
   };
 
-  lint = {
+  lint = {config ? {}, ...}: {
     command = ''
+      echo SHA is "$SHA"
       echo linting go...
       golangci-lint run
 
@@ -19,6 +20,7 @@ in {
     '';
     after = ["tidy"];
     dependencies = with pkgs; [golangci-lint go gcc fd alejandra];
+    env.SHA = config.action.facts.push.value.sha or "no sha";
   };
 
   bump = {

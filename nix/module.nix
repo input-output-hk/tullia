@@ -6,7 +6,7 @@
   ...
 }: let
   inherit (lib) mkOption;
-  inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything strMatching;
+  inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything strMatching function path;
   inherit (builtins) concatStringsSep filter isString split toJSON typeOf;
 
   pp2 = a: b: __trace (__toJSON a) b;
@@ -20,12 +20,6 @@
     ];
 
   getImageName = image: "${image.imageName}:${image.imageTag}";
-  /*
-   image:
-   lib.fileContents (pkgs.runCommand "imageName" {} ''
-     echo "${image.imageName}:${image.imageTag}" > $out
-   '');
-   */
 
   moduleConfig = config;
 
@@ -172,6 +166,37 @@
       after = mkOption {
         type = listOf str;
         default = [];
+      };
+
+      action = mkOption {
+        default = {};
+        type = submodule {
+          options = {
+            name = mkOption {type = str;};
+
+            id = mkOption {type = str;};
+
+            facts = mkOption {
+              default = {};
+              type = attrsOf (submodule (
+                {name, ...}: {
+                  options = {
+                    name = mkOption {
+                      type = str;
+                      default = name;
+                    };
+
+                    id = mkOption {type = str;};
+
+                    binary_hash = mkOption {type = str;};
+
+                    value = mkOption {type = attrsOf anything;};
+                  };
+                }
+              ));
+            };
+          };
+        };
       };
 
       command = mkOption {
@@ -992,38 +1017,19 @@
     action = config;
   in {
     options = {
-      name = mkOption {
-        type = str;
-        default = name;
-      };
-
-      inputs = mkOption {
-        type = attrsOf (submodule {
-          options = {
-            match = mkOption {
-              type = str;
-            };
-
-            not = mkOption {
-              type = bool;
-              default = false;
-            };
-
-            optional = mkOption {
-              type = bool;
-              default = false;
-            };
-
-            select = mkOption {
-              type = str;
-              default = "latest";
-            };
-          };
-        });
-      };
-
-      output = mkOption {
-        type = attrsOf anything;
+      io = mkOption {
+        type = path;
+        apply = v: let
+          def = pkgs.runCommand "def.cue" {nativeBuildInputs = [pkgs.cue];} ''
+            cue def \
+              ${../lib/prelude.cue} \
+              ${../lib/github.cue} \
+              ${../lib/slack.cue} \
+              ${v} \
+              > $out
+          '';
+        in
+          lib.fileContents def;
       };
 
       job = mkOption {
@@ -1039,7 +1045,7 @@
     config = lib.mkIf (action.task != null) (let
       sname = sanitizeServiceName name;
     in {
-      job.${sname}.group.tullia.task.tullia = moduleConfig.generatedTask."tullia-${action.task}";
+      job.${sname}.group.tullia.task.tullia = moduleConfig.wrappedTask."${action.task}";
     });
   });
 in {
@@ -1059,7 +1065,7 @@ in {
       type = attrsOf taskType;
     };
 
-    generatedTask = mkOption {
+    wrappedTask = mkOption {
       default = {};
       type = attrsOf taskType;
     };
@@ -1073,15 +1079,8 @@ in {
   config = {
     dag = lib.mapAttrs (name: task: task.after) config.task;
 
-    generatedTask = let
-      filtered =
-        lib.filterAttrs (
-          n: v:
-            (builtins.match "^tullia-.*" n) == null
-        )
-        config.task;
-
-      impureRunnables = lib.mapAttrs (n: v: "${v.impure.run}/bin/${n}-impure") filtered;
+    wrappedTask = let
+      impureRunnables = lib.mapAttrs (n: v: "${v.impure.run}/bin/${n}-impure") config.task;
 
       spec = lib.escapeShellArg (builtins.toJSON {
         inherit (config) dag;
@@ -1090,7 +1089,7 @@ in {
     in
       lib.mapAttrs' (
         n: v: {
-          name = "tullia-${n}";
+          name = n;
           value = {
             dependencies = with pkgs; [tullia];
             command = ''
@@ -1105,6 +1104,6 @@ in {
           };
         }
       )
-      filtered;
+      config.task;
   };
 }
