@@ -239,7 +239,7 @@
       };
 
       runtime = mkOption {
-        type = enum ["nsjail" "podman" "impure"];
+        type = enum ["nsjail" "podman" "unwrapped"];
         default = "nsjail";
       };
 
@@ -920,7 +920,7 @@
         };
       };
 
-      impure = mkOption {
+      unwrapped = mkOption {
         default = {};
         type = submodule {
           options = {
@@ -930,10 +930,11 @@
                 Simply run the task without any container
               '';
               default = pkgs.writeShellApplication {
-                name = "${task.name}-impure";
+                name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
                 text = ''
                   set -x
+                  ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
                   ${task.command}
                 '';
               };
@@ -1080,11 +1081,11 @@ in {
     dag = lib.mapAttrs (name: task: task.after) config.task;
 
     wrappedTask = let
-      impureRunnables = lib.mapAttrs (n: v: "${v.impure.run}/bin/${n}-impure") config.task;
+      bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") config.task;
 
       spec = lib.escapeShellArg (builtins.toJSON {
         inherit (config) dag;
-        bin = impureRunnables;
+        inherit bin;
       });
     in
       lib.mapAttrs' (
