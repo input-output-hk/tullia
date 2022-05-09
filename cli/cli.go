@@ -8,12 +8,14 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/rs/zerolog"
 )
 
 type CLIModel struct {
 	tree  *Tree
 	width int
 	ctx   context.Context
+	log   zerolog.Logger
 }
 
 type contextMsg struct{}
@@ -67,7 +69,8 @@ func (m *CLIModel) View() string {
 	for _, taskName := range m.tree.taskNames {
 		vert, err := m.tree.dag.GetVertex(taskName)
 		if err != nil {
-			panic(err)
+			// TODO: proper error handling
+			m.log.Fatal().Err(err).Str("task", taskName).Msg("missing vertex")
 		}
 		tasks[taskName] = vert.Value.(*Task)
 		if len(taskName) > taskNameLen {

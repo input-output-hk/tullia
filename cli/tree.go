@@ -45,18 +45,18 @@ func newTree(log zerolog.Logger, config Config) (*Tree, error) {
 
 func (t *Tree) start() {
 	if t.prepareWG == nil {
-		panic("Tried to start without calling prepare first")
+		t.config.log.Fatal().Msg("start was called before prepare")
 	}
 	t.prepareWG.Done()
 	t.startWG.Wait()
 }
 
 func (t *Tree) eval() error {
-	if t.config.runSpec == nil {
-		if t.config.Mode == "passthrough" {
-			t.dagResult = map[string][]string{t.config.Task: {}}
+	if t.config.Do.runSpec == nil {
+		if t.config.Do.Mode == "passthrough" {
+			t.dagResult = map[string][]string{t.config.Do.Task: {}}
 		} else {
-			cmd := exec.Command("nix", "eval", "--json", t.config.DagFlake)
+			cmd := exec.Command("nix", "eval", "--json", t.config.Do.DagFlake)
 			cmd.Stderr = os.Stderr
 
 			dagResult := map[string][]string{}
@@ -70,7 +70,7 @@ func (t *Tree) eval() error {
 			t.dagResult = dagResult
 		}
 	} else {
-		t.dagResult = t.config.runSpec.Dag
+		t.dagResult = t.config.Do.runSpec.Dag
 	}
 
 	return nil

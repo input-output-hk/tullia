@@ -149,7 +149,7 @@
 
       config =
         if task.nomad.driver == "podman"
-        then {image = lib.mkDefault (getImageName task.oci.image);}
+        then {image = lib.mkDefault (task.oci.image // {toString = getImageName task.oci.image;});}
         else throw "Driver '${task.nomad.driver}' not supported yet";
     };
   });
@@ -213,9 +213,7 @@
         default = let
           preset = presets.${config.preset} {inherit config;};
         in
-          if (preset ? env)
-          then lib.mapAttrs (key: value: lib.mkDefault value) preset.env
-          else {};
+          lib.mapAttrs (key: value: lib.mkDefault value) (preset.env or {});
       };
 
       memory = mkOption {
@@ -547,7 +545,7 @@
               closure
               ;
           in {
-            layers = lib.mkDefault ([closure] ++ task.dependencies);
+            layers = lib.mkDefault ([rootDir closure] ++ task.dependencies);
 
             contents = lib.mkDefault [
               (pkgs.symlinkJoin {
@@ -1041,6 +1039,38 @@
         type = nullOr str;
         default = null;
       };
+
+      prepare = mkOption {
+        type = anything;
+        default = let
+          mapTask = taskName: task: {
+            name = taskName;
+            inherit (task) config driver;
+          };
+
+          mapped = lib.flatten (
+            lib.mapAttrsToList (
+              jobName: job:
+                lib.mapAttrsToList (
+                  groupName: group:
+                    lib.mapAttrsToList mapTask group.task
+                )
+                job.group
+            )
+            action.job
+          );
+
+          res = pkgs.runCommand "tojson" {nativeBuildInputs = [pkgs.jq];} ''
+            jq < ${pkgs.writeText "in.json" (builtins.toJSON mapped)} > $out
+          '';
+        in
+          pkgs.writeShellApplication {
+            name = "prepare.sh";
+            text = ''
+              cat ${res}
+            '';
+          };
+      };
     };
 
     config = lib.mkIf (action.task != null) (let
@@ -1098,7 +1128,7 @@ in {
                 cp -r ${rootDir} /repo
                 chmod u+w -R /repo
               fi
-              tullia --run-spec ${spec} --mode cli --runtime impure ${n}
+              tullia do ${n} --run-spec ${spec} --mode cli --runtime unwrapped
             '';
             nsjail.setsid = true;
             oci.maxLayers = 30;

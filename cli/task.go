@@ -56,7 +56,7 @@ func (t *Task) prepare(prepareWG, startWG *sync.WaitGroup) error {
 			prepareWG.Wait()
 			t.stage = "wait"
 
-			if t.config.runSpec == nil {
+			if t.config.Do.runSpec == nil {
 				if t.fail(t.eval()) {
 					return
 				}
@@ -64,7 +64,7 @@ func (t *Task) prepare(prepareWG, startWG *sync.WaitGroup) error {
 					return
 				}
 			} else {
-				t.storePath = t.config.runSpec.Bin[t.name]
+				t.storePath = t.config.Do.runSpec.Bin[t.name]
 			}
 
 			t.dependencies.Wait()
@@ -102,7 +102,7 @@ func (t *Task) preExec(stage string) {
 		t.runStart = time.Now()
 	}
 
-	switch t.config.Mode {
+	switch t.config.Do.Mode {
 	case "json":
 		t.preExecJSON()
 	case "cli":
@@ -112,7 +112,7 @@ func (t *Task) preExec(stage string) {
 	case "passthrough":
 		t.preExecPassthrough()
 	default:
-		panic("Unknown mode " + t.config.Mode)
+		t.config.log.Fatal().Str("mode", t.config.Do.Mode).Msg("unknown mode")
 	}
 }
 
@@ -159,7 +159,7 @@ func (t *Task) exec(stage string, f func()) error {
 		t.runEnd = time.Now()
 	}
 
-	switch t.config.Mode {
+	switch t.config.Do.Mode {
 	case "json":
 		return t.execJSON(stage, f, err)
 	case "cli":
@@ -169,7 +169,7 @@ func (t *Task) exec(stage string, f func()) error {
 	case "passthrough":
 		return t.execCommon(stage, f, err)
 	default:
-		return fmt.Errorf("unknown mode %q", t.config.Mode)
+		return fmt.Errorf("unknown mode %q", t.config.Do.Mode)
 	}
 }
 
@@ -216,18 +216,18 @@ func (t *Task) fail(err error) bool {
 
 func (t *Task) eval() error {
 	t.cmd = exec.Command("nix", "eval", "--raw",
-		t.config.TaskFlake+"."+t.name+"."+t.config.Runtime+".run.outPath")
+		t.config.Do.TaskFlake+"."+t.name+"."+t.config.Do.Runtime+".run.outPath")
 	t.preExec("eval")
 	buf := &bytes.Buffer{}
 	t.cmd.Stdout = buf
 	return t.exec("wait", func() {
-		t.storePath = buf.String() + "/bin/" + t.name + "-" + t.config.Runtime
+		t.storePath = buf.String() + "/bin/" + t.name + "-" + t.config.Do.Runtime
 	})
 }
 
 func (t *Task) build() error {
 	t.cmd = exec.Command("nix", "build", "--no-link",
-		t.config.TaskFlake+"."+t.name+"."+t.config.Runtime+".run")
+		t.config.Do.TaskFlake+"."+t.name+"."+t.config.Do.Runtime+".run")
 	t.preExec("build")
 	return t.exec("wait", func() {})
 }

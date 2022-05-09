@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
@@ -30,9 +29,7 @@ func supervisor(config Config) (*Supervisor, error) {
 }
 
 func (s *Supervisor) start() error {
-	switch s.config.Mode {
-	case "json":
-		return nil
+	switch s.config.Do.Mode {
 	case "cli":
 		return s.startCLI()
 	case "verbose":
@@ -40,13 +37,12 @@ func (s *Supervisor) start() error {
 	case "passthrough":
 		return s.startVerbose()
 	default:
-		return fmt.Errorf("Unknown mode: %q", s.config.Mode)
-		// return s.tree.start()
+		return fmt.Errorf("Unknown mode: %q", s.config.Do.Mode)
 	}
 }
 
 func (s *Supervisor) startCLI() error {
-	if err := s.tree.prepare(s.config.Task); err != nil {
+	if err := s.tree.prepare(s.config.Do.Task); err != nil {
 		return err
 	}
 
@@ -57,16 +53,15 @@ func (s *Supervisor) startCLI() error {
 		cancel()
 	}()
 
-	if err := tea.NewProgram(&CLIModel{tree: s.tree, ctx: ctx}).Start(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+	if err := tea.NewProgram(&CLIModel{tree: s.tree, ctx: ctx, log: s.config.log}).Start(); err != nil {
+		s.config.log.Fatal().Err(err).Msg("starting CLI")
 	}
 
 	return nil
 }
 
 func (s *Supervisor) startVerbose() error {
-	if err := s.tree.prepare(s.config.Task); err != nil {
+	if err := s.tree.prepare(s.config.Do.Task); err != nil {
 		return err
 	}
 

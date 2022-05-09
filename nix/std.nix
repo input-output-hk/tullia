@@ -18,8 +18,8 @@ inputs: name: {
       pkgs.writeShellApplication {
         name = "run-${taskName}";
         text = ''
-          nix build --no-link .#tullia.${system}.wrappedTask.${taskName}.nsjail.run
-          ${tullia}/bin/tullia ${lib.escapeShellArg taskName} \
+          nix build --no-link .#tullia.${system}.wrappedTask.${taskName}.${runtime}.run
+          ${tullia}/bin/tullia do ${lib.escapeShellArg taskName} \
             ${toString (lib.cli.toGNUCommandLine {} {
             task-flake = ".#tullia.${system}.wrappedTask";
             dag-flake = ".#tullia.${system}.dag";

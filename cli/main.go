@@ -6,6 +6,7 @@ import (
 	"os"
 
 	arg "github.com/alexflint/go-arg"
+	"github.com/rs/zerolog"
 )
 
 var buildVersion = "dev"
@@ -16,15 +17,46 @@ type RunSpec struct {
 	Bin map[string]string   `json:"bin"`
 }
 
-type Config struct {
-	DagFlake  string `arg:"--dag-flake"`
-	Mode      string `arg:"--mode"`
-	Runtime   string `arg:"--runtime"`
-	TaskFlake string `arg:"--task-flake"`
-	Task      string `arg:"positional"`
+func (r RunSpec) MarshalZerologObject(event *zerolog.Event) {
+	dag := zerolog.Dict()
+	for k, v := range r.Dag {
+		dag.Strs(k, v)
+	}
+	event.Dict("Dag", dag)
 
-	RunSpec string `arg:"--run-spec"`
-	runSpec *RunSpec
+	bin := zerolog.Dict()
+	for k, v := range r.Bin {
+		dag.Str(k, v)
+	}
+	event.Dict("Bin", bin)
+}
+
+type Config struct {
+	LogLevel string `arg:"--log-level" default:"trace" help:"one of trace,debug,info,warn,error,fatal,panic"`
+	Do       *Do    `arg:"subcommand:do" help:"execute the given task"`
+	log      zerolog.Logger
+}
+
+type Do struct {
+	Task      string `arg:"positional"`
+	DagFlake  string `arg:"--dag-flake" default:".#tullia.x86_64-linux.dag"`
+	Mode      string `arg:"--mode" default:"cli"`
+	Runtime   string `arg:"--runtime" default:"nsjail"`
+	TaskFlake string `arg:"--task-flake" default:".#tullia.x86_64-linux.wrappedTask"`
+	RunSpec   string `arg:"--run-spec" help:"used internally"`
+	runSpec   *RunSpec
+}
+
+func (d Do) MarshalZerologObject(event *zerolog.Event) {
+	event.
+		Str("Task", d.Task).
+		Str("DagFlake", d.DagFlake).
+		Str("Mode", d.Mode).
+		Str("Runtime", d.Runtime).
+		Str("TaskFlake", d.TaskFlake)
+	if d.runSpec != nil {
+		event.Object("RunSpec", d.runSpec)
+	}
 }
 
 func Version() string {
@@ -36,28 +68,54 @@ func (Config) Version() string {
 }
 
 func main() {
-	config := Config{
-		DagFlake:  ".#dag",
-		Mode:      "cli",
-		Runtime:   "nsjail",
-		Task:      "",
-		TaskFlake: ".#task",
-	}
-	arg.MustParse(&config)
+	log := zerolog.New(zerolog.NewConsoleWriter()).With().Timestamp().Logger()
 
-	if len(config.RunSpec) > 0 {
-		rs := &RunSpec{}
-		if err := json.Unmarshal([]byte(config.RunSpec), rs); err != nil {
-			fmt.Println(err.Error())
-			os.Exit(1)
+	config := Config{log: log}
+
+	parser, err := arg.NewParser(arg.Config{}, &config)
+	if err != nil {
+		log.Fatal().Err(err).Msg("initializing argument parser")
+	}
+
+	err = parser.Parse(os.Args[1:])
+
+	switch err {
+	case nil:
+	case arg.ErrHelp:
+		parser.WriteHelp(os.Stdout)
+		os.Exit(0)
+	case arg.ErrVersion:
+		fmt.Fprintln(os.Stdout, Version())
+		os.Exit(0)
+	default:
+		log.Fatal().Err(err).Msg("parsing arguments")
+	}
+
+	if logLevel, err := zerolog.ParseLevel(config.LogLevel); err != nil {
+		log.Fatal().Err(err).Msg("setting log level")
+	} else {
+		zerolog.SetGlobalLevel(logLevel)
+	}
+
+	switch {
+	case config.Do != nil:
+		if len(config.Do.RunSpec) > 0 {
+			rs := &RunSpec{}
+			if err := json.Unmarshal([]byte(config.Do.RunSpec), rs); err != nil {
+				log.Fatal().Err(err).Msg("parsing run spec")
+			}
+			config.Do.runSpec = rs
 		}
-		config.runSpec = rs
-	}
 
-	if sv, err := supervisor(config); err != nil {
-		panic(err)
-	} else if err := sv.start(); err != nil {
-		panic(err)
+		log.Debug().Object("config", config.Do).Msg("parsed args")
+
+		if sv, err := supervisor(config); err != nil {
+			log.Fatal().Err(err).Msg("creating supervisor")
+		} else if err := sv.start(); err != nil {
+			log.Fatal().Err(err).Msg("starting supervisor")
+		}
+	default:
+		parser.WriteHelp(os.Stderr)
 	}
 }
 
