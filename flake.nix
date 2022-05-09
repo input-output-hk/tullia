@@ -8,15 +8,7 @@
   };
 
   outputs = inputs: let
-    pp = a: pp2 a a;
-    pp2 = a: b: builtins.trace (builtins.toJSON a) b;
-
     mkTullia = import ./nix/std.nix inputs;
-
-    mkCicero = name: {
-      inherit name;
-      clade = "cicero";
-    };
   in
     (inputs.std.growOn {
         inherit inputs;
@@ -25,7 +17,6 @@
           (inputs.std.functions "library")
           (mkTullia "task")
           (inputs.std.functions "action")
-          # (mkCicero "action")
           (inputs.std.devshells "devshell")
           (inputs.std.installables "apps")
         ];
