@@ -33,21 +33,21 @@ func (r RunSpec) MarshalZerologObject(event *zerolog.Event) {
 
 type Config struct {
 	LogLevel string `arg:"--log-level" default:"trace" help:"one of trace,debug,info,warn,error,fatal,panic"`
-	Do       *Do    `arg:"subcommand:do" help:"execute the given task"`
+	Run      *Run   `arg:"subcommand:run" help:"execute the given task"`
 	log      zerolog.Logger
 }
 
-type Do struct {
+type Run struct {
 	Task      string `arg:"positional"`
 	DagFlake  string `arg:"--dag-flake" default:".#tullia.x86_64-linux.dag"`
 	Mode      string `arg:"--mode" default:"cli"`
 	Runtime   string `arg:"--runtime" default:"nsjail"`
-	TaskFlake string `arg:"--task-flake" default:".#tullia.x86_64-linux.wrappedTask"`
+	TaskFlake string `arg:"--task-flake" default:".#tullia.x86_64-linux.task"`
 	RunSpec   string `arg:"--run-spec" help:"used internally"`
 	runSpec   *RunSpec
 }
 
-func (d Do) MarshalZerologObject(event *zerolog.Event) {
+func (d Run) MarshalZerologObject(event *zerolog.Event) {
 	event.
 		Str("Task", d.Task).
 		Str("DagFlake", d.DagFlake).
@@ -98,22 +98,23 @@ func main() {
 	}
 
 	switch {
-	case config.Do != nil:
-		if len(config.Do.RunSpec) > 0 {
+	case config.Run != nil:
+		if len(config.Run.RunSpec) > 0 {
 			rs := &RunSpec{}
-			if err := json.Unmarshal([]byte(config.Do.RunSpec), rs); err != nil {
+			if err := json.Unmarshal([]byte(config.Run.RunSpec), rs); err != nil {
 				log.Fatal().Err(err).Msg("parsing run spec")
 			}
-			config.Do.runSpec = rs
+			config.Run.runSpec = rs
 		}
 
-		log.Debug().Object("config", config.Do).Msg("parsed args")
+		log.Debug().Object("config", config.Run).Msg("parsed args")
 
 		if sv, err := supervisor(config); err != nil {
 			log.Fatal().Err(err).Msg("creating supervisor")
 		} else if err := sv.start(); err != nil {
 			log.Fatal().Err(err).Msg("starting supervisor")
 		}
+		log.Debug().Msg("done")
 	default:
 		parser.WriteHelp(os.Stderr)
 	}

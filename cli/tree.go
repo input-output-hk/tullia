@@ -43,20 +43,30 @@ func newTree(log zerolog.Logger, config Config) (*Tree, error) {
 	return tree, nil
 }
 
-func (t *Tree) start() {
+func (t *Tree) start() error {
 	if t.prepareWG == nil {
 		t.config.log.Fatal().Msg("start was called before prepare")
 	}
 	t.prepareWG.Done()
 	t.startWG.Wait()
+
+	for _, vert := range t.dag.SourceVertices() {
+		if task, ok := vert.Value.(*Task); !ok {
+			return fmt.Errorf("converting vertex of %q to task", vert.ID)
+		} else if task.err != nil {
+			return errors.WithMessagef(task.err, "running %s", vert.ID)
+		}
+	}
+
+	return nil
 }
 
 func (t *Tree) eval() error {
-	if t.config.Do.runSpec == nil {
-		if t.config.Do.Mode == "passthrough" {
-			t.dagResult = map[string][]string{t.config.Do.Task: {}}
+	if t.config.Run.runSpec == nil {
+		if t.config.Run.Mode == "passthrough" {
+			t.dagResult = map[string][]string{t.config.Run.Task: {}}
 		} else {
-			cmd := exec.Command("nix", "eval", "--json", t.config.Do.DagFlake)
+			cmd := exec.Command("nix", "eval", "--json", t.config.Run.DagFlake)
 			cmd.Stderr = os.Stderr
 
 			dagResult := map[string][]string{}
@@ -70,7 +80,7 @@ func (t *Tree) eval() error {
 			t.dagResult = dagResult
 		}
 	} else {
-		t.dagResult = t.config.Do.runSpec.Dag
+		t.dagResult = t.config.Run.runSpec.Dag
 	}
 
 	return nil
@@ -140,10 +150,10 @@ func (t *Tree) prepare(taskName string) error {
 		if err.Error() == fmt.Sprintf("vertex %s not found in the graph", taskName) {
 			return fmt.Errorf("Available tasks: %s\n", strings.Join(t.taskNames, " "))
 		}
-		return errors.WithMessagef(err, "Failed to get vertex %q", taskName)
+		return errors.WithMessagef(err, "failed to get vertex %q", taskName)
 	}
 
 	return errors.WithMessagef(
 		root.Value.(*Task).prepare(t.prepareWG, t.startWG),
-		"Failed to run %q", taskName)
+		"failed to prepare %q", taskName)
 }

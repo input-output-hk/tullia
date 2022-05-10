@@ -695,9 +695,10 @@
                     ln -s ${pkgs.coreutils-full}/usr/bin/env "$root/usr/bin/env"
 
                     function finish {
+                      status="$?"
                       chmod u+w -R "$root" 2>/dev/null
                       rm -rf "$alloc" "$root"
-                      # rmdir "$cgroup"
+                      exit "$status"
                     }
                     trap finish EXIT
 
@@ -718,16 +719,18 @@
 
             innerScript = mkOption {
               type = package;
-              default =
-                pkgs.writeShellScriptBin config.name
-                (
+              default = pkgs.writeShellApplication {
+                name = config.name;
+                text =
                   if typeOf config.command == "string"
                   then ''
                     [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
                     ${config.command}
                   ''
-                  else lib.escapeShellArgs config.command
-                );
+                  else ''
+                    exec ${lib.escapeShellArgs config.command}
+                  '';
+              };
             };
 
             setsid = mkOption {
@@ -930,11 +933,19 @@
               default = pkgs.writeShellApplication {
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
-                text = ''
-                  set -x
-                  ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                  ${task.command}
-                '';
+                text = (
+                  if typeOf task.command == "string"
+                  then ''
+                    set -x
+                    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+                    ${task.command}
+                  ''
+                  else ''
+                    set -x
+                    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+                    exec ${lib.escapeShellArgs task.command}
+                  ''
+                );
               };
             };
           };
@@ -1124,11 +1135,12 @@ in {
           value = {
             dependencies = with pkgs; [tullia];
             command = ''
+              set -x
               if [ ! -d /repo ]; then
                 cp -r ${rootDir} /repo
                 chmod u+w -R /repo
               fi
-              tullia do ${n} --run-spec ${spec} --mode cli --runtime unwrapped
+              exec tullia run ${n} --run-spec ${spec} --mode passthrough --runtime unwrapped
             '';
             nsjail.setsid = true;
             oci.maxLayers = 30;

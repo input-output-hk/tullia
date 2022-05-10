@@ -29,43 +29,41 @@ func supervisor(config Config) (*Supervisor, error) {
 }
 
 func (s *Supervisor) start() error {
-	switch s.config.Do.Mode {
+	switch s.config.Run.Mode {
 	case "cli":
 		return s.startCLI()
-	case "verbose":
-		return s.startVerbose()
-	case "passthrough":
+	case "verbose", "passthrough":
 		return s.startVerbose()
 	default:
-		return fmt.Errorf("Unknown mode: %q", s.config.Do.Mode)
+		return fmt.Errorf("Unknown mode: %q", s.config.Run.Mode)
 	}
 }
 
 func (s *Supervisor) startCLI() error {
-	if err := s.tree.prepare(s.config.Do.Task); err != nil {
+	if err := s.tree.prepare(s.config.Run.Task); err != nil {
 		return err
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	failed := make(chan error, 1)
 
 	go func() {
-		s.tree.start()
+		err := s.tree.start()
 		cancel()
+		failed <- err
 	}()
 
 	if err := tea.NewProgram(&CLIModel{tree: s.tree, ctx: ctx, log: s.config.log}).Start(); err != nil {
 		s.config.log.Fatal().Err(err).Msg("starting CLI")
 	}
 
-	return nil
+	return <-failed
 }
 
 func (s *Supervisor) startVerbose() error {
-	if err := s.tree.prepare(s.config.Do.Task); err != nil {
+	if err := s.tree.prepare(s.config.Run.Task); err != nil {
 		return err
 	}
 
-	s.tree.start()
-
-	return nil
+	return s.tree.start()
 }
