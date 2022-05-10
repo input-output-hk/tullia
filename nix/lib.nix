@@ -20,6 +20,7 @@ inputs: let
       name,
       id,
       inputs,
+      ociRegistry,
     }:
       (evalModules
         {
@@ -27,7 +28,7 @@ inputs: let
             ./module.nix
             {
               _file = ./lib.nix;
-              _module.args = {inherit pkgs rootDir;};
+              _module.args = {inherit pkgs rootDir ociRegistry;};
               inherit action;
               task = tasks.${system};
             }
@@ -57,7 +58,10 @@ inputs: let
         ./module.nix
         {
           _file = ./lib.nix;
-          _module.args = {inherit pkgs rootDir;};
+          _module.args = {
+            inherit pkgs rootDir;
+            ociRegistry = "localhost";
+          };
           inherit task;
         }
       ];

@@ -3,6 +3,7 @@
   pkgs,
   config,
   rootDir,
+  ociRegistry,
   ...
 }: let
   inherit (lib) mkOption;
@@ -289,7 +290,7 @@
 
             name = mkOption {
               type = str;
-              default = "docker.infra.aws.iohkdev.io/${task.name}";
+              default = "${ociRegistry}/${task.name}";
             };
 
             tag = mkOption {
@@ -1054,33 +1055,28 @@
       prepare = mkOption {
         type = anything;
         default = let
-          mapTask = taskName: task: {
-            name = taskName;
-            inherit (task) config driver;
-          };
-
           mapped = lib.flatten (
             lib.mapAttrsToList (
               jobName: job:
                 lib.mapAttrsToList (
                   groupName: group:
-                    lib.mapAttrsToList mapTask group.task
+                    lib.mapAttrsToList (
+                      taskName: task:
+                        if task.config ? image
+                        then {
+                          name = getImageName task.config.image;
+                          configDrv = task.config.image.drvPath;
+                        }
+                        else null
+                    )
+                    group.task
                 )
                 job.group
             )
             action.job
           );
-
-          res = pkgs.runCommand "tojson" {nativeBuildInputs = [pkgs.jq];} ''
-            jq < ${pkgs.writeText "in.json" (builtins.toJSON mapped)} > $out
-          '';
         in
-          pkgs.writeShellApplication {
-            name = "prepare.sh";
-            text = ''
-              cat ${res}
-            '';
-          };
+          lib.filter lib.isAttrs mapped;
       };
     };
 
