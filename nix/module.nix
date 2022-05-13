@@ -1132,10 +1132,6 @@ in {
             dependencies = with pkgs; [tullia];
             command = ''
               set -x
-              if [ ! -d /repo ]; then
-                cp -r ${rootDir} /repo
-                chmod u+w -R /repo
-              fi
               exec tullia run ${n} --run-spec ${spec} --mode passthrough --runtime unwrapped
             '';
             nsjail.setsid = true;

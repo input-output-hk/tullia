@@ -1,8 +1,8 @@
 inputs: let
   inherit (inputs.nixpkgs.lib) evalModules filterAttrs mapAttrs;
 
-  augmentPkgs = nixpkgs: system:
-    nixpkgs.legacyPackages.${system}
+  augmentPkgs = system:
+    inputs.nixpkgs.legacyPackages.${system}
     // {
       tullia = inputs.self.defaultPackage.${system};
       inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
@@ -11,10 +11,9 @@ inputs: let
   evalAction = {
     actions,
     tasks,
-    nixpkgs,
-    rootDir,
+    rootDir ? null,
   }: system: action: let
-    pkgs = augmentPkgs nixpkgs system;
+    pkgs = augmentPkgs system;
   in
     {
       name,
@@ -48,10 +47,9 @@ inputs: let
 
   evalTask = {
     tasks,
-    nixpkgs,
-    rootDir,
+    rootDir ? null,
   }: system: task: let
-    pkgs = augmentPkgs nixpkgs system;
+    pkgs = augmentPkgs system;
   in
     (evalModules {
       modules = [
@@ -67,10 +65,22 @@ inputs: let
       ];
     })
     .config;
-in {
+in rec {
   ciceroFromStd = args:
     builtins.mapAttrs (evalAction args) args.actions;
 
   tulliaFromStd = args:
     builtins.mapAttrs (evalTask args) args.tasks;
+
+  fromStd = args: {
+    tullia = tulliaFromStd {
+      inherit (args) tasks;
+      rootDir = args.rootDir or null;
+    };
+
+    cicero = ciceroFromStd {
+      inherit (args) actions tasks;
+      rootDir = args.rootDir or null;
+    };
+  };
 }
