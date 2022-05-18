@@ -17,17 +17,28 @@ file = Dir.glob('**/*.nix').find { |path| File.open(path) { |fd| fd.grep(needle)
 
 raise "couldn't find file containing #{old_sha}" unless file
 
+file_mtime = File.mtime(file)
+mod_mtime = File.mtime('go.mod')
+if file_mtime >= mod_mtime
+  puts "#{file} is newer than go.mod - skip bump"
+  exit
+else
+  puts "#{file} is older than go.mod - #{file_mtime} < #{mod_mtime}"
+end
+
 puts "#{file} is at #{old_sha} #{version}"
 
 puts 'Checking vendorSha256...'
 
 new_sha = nil
 
-Open3.popen3('nix', 'build', "#{pkg}.invalidHash") do |_si, _so, se|
+Open3.popen3('nix', '-L', 'build', "#{pkg}.invalidHash") do |_si, _so, se|
   se.each_line do |line|
     new_sha = $LAST_MATCH_INFO[:sha] if line =~ /^\s+got:\s+(?<sha>sha256-\S+)$/
   end
 end
+
+raise "couldn't build package" unless $CHILD_STATUS.success?
 
 if old_sha == new_sha
   puts 'Skipping vendorSha256 update'

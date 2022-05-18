@@ -35,6 +35,5 @@
       tasks = inputs.std.harvest inputs.self ["tullia" "task"];
     })
     # top level tullia outputs
-    (lib // {inherit tasks;})
-    ;
+    (lib // {inherit tasks;});
 }

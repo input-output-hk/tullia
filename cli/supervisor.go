@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rs/zerolog"
@@ -15,11 +16,20 @@ type Supervisor struct {
 }
 
 func supervisor(config Config) (*Supervisor, error) {
-	log := zerolog.
-		New(zerolog.NewConsoleWriter()).
-		With().
-		Timestamp().
-		Logger()
+	var log zerolog.Logger
+	if config.Run.Mode == "json" {
+		log = zerolog.
+			New(os.Stdout).
+			With().
+			Timestamp().
+			Logger()
+	} else {
+		log = zerolog.
+			New(zerolog.NewConsoleWriter()).
+			With().
+			Timestamp().
+			Logger()
+	}
 
 	if tree, err := newTree(log, config); err != nil {
 		return nil, err
@@ -32,8 +42,8 @@ func (s *Supervisor) start() error {
 	switch s.config.Run.Mode {
 	case "cli":
 		return s.startCLI()
-	case "verbose", "passthrough":
-		return s.startVerbose()
+	case "verbose", "passthrough", "json":
+		return s.startCommon()
 	default:
 		return fmt.Errorf("Unknown mode: %q", s.config.Run.Mode)
 	}
@@ -60,7 +70,7 @@ func (s *Supervisor) startCLI() error {
 	return <-failed
 }
 
-func (s *Supervisor) startVerbose() error {
+func (s *Supervisor) startCommon() error {
 	if err := s.tree.prepare(s.config.Run.Task); err != nil {
 		return err
 	}

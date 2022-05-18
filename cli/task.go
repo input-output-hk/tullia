@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -28,8 +29,6 @@ type Task struct {
 	dependencyErr error
 	log           zerolog.Logger
 	cliLines      *bytes.Buffer
-	evalStart     time.Time
-	evalEnd       time.Time
 	buildStart    time.Time
 	buildEnd      time.Time
 	runStart      time.Time
@@ -57,9 +56,6 @@ func (t *Task) prepare(prepareWG, startWG *sync.WaitGroup) error {
 			t.stage = "wait"
 
 			if t.config.Run.runSpec == nil {
-				if t.fail(t.eval()) {
-					return
-				}
 				if t.fail(t.build()) {
 					return
 				}
@@ -94,8 +90,6 @@ func (t *Task) preExec(stage string) {
 	t.stage = stage
 
 	switch stage {
-	case "eval":
-		t.evalStart = time.Now()
 	case "build":
 		t.buildStart = time.Now()
 	case "run":
@@ -123,19 +117,31 @@ func (t *Task) preExecVerbose() {
 		With().
 		Str("level", zerolog.LevelInfoValue).
 		Timestamp()
-	t.cmd.Stdout = log.Str("std", "out").Logger()
-	t.cmd.Stderr = log.Str("std", "err").Logger()
+	if t.cmd.Stdout == nil {
+		t.cmd.Stdout = log.Str("std", "out").Logger()
+	}
+	if t.cmd.Stderr == nil {
+		t.cmd.Stderr = log.Str("std", "err").Logger()
+	}
 }
 
 func (t *Task) preExecCLI() {
 	t.cliLines = &bytes.Buffer{}
-	t.cmd.Stdout = t.cliLines
-	t.cmd.Stderr = t.cliLines
+	if t.cmd.Stdout == nil {
+		t.cmd.Stdout = t.cliLines
+	}
+	if t.cmd.Stderr == nil {
+		t.cmd.Stderr = t.cliLines
+	}
 }
 
 func (t *Task) preExecPassthrough() {
-	t.cmd.Stdout = os.Stdout
-	t.cmd.Stderr = os.Stderr
+	if t.cmd.Stdout == nil {
+		t.cmd.Stdout = os.Stdout
+	}
+	if t.cmd.Stderr == nil {
+		t.cmd.Stderr = os.Stderr
+	}
 	t.cmd.Stdin = os.Stdin
 	t.cmd.Env = os.Environ()
 }
@@ -143,16 +149,22 @@ func (t *Task) preExecPassthrough() {
 func (t *Task) preExecJSON() {
 	t.log.Debug().Stringer("cmd", t.cmd).Msg("start")
 	log := t.log.With().Str("level", zerolog.LevelDebugValue)
-	t.cmd.Stdout = log.Str("std", "out").Logger()
-	t.cmd.Stderr = log.Str("std", "err").Logger()
+	if t.cmd.Stdout == nil {
+		t.cmd.Stdout = log.Str("std", "out").Logger()
+	}
+	if t.cmd.Stderr == nil {
+		t.cmd.Stderr = log.Str("std", "err").Logger()
+	}
 }
 
 func (t *Task) exec(stage string, f func()) error {
-	err := t.cmd.Run()
+	err := t.cmd.Start()
+	if err == nil {
+		// TODO: Measure resources here in cli mode
+		err = t.cmd.Wait()
+	}
 
 	switch t.stage {
-	case "eval":
-		t.evalEnd = time.Now()
 	case "build":
 		t.buildEnd = time.Now()
 	case "run":
@@ -161,19 +173,15 @@ func (t *Task) exec(stage string, f func()) error {
 
 	switch t.config.Run.Mode {
 	case "json":
-		return t.execJSON(stage, f, err)
-	case "cli":
-		return t.execCommon(stage, f, err)
-	case "verbose":
-		return t.execCommon(stage, f, err)
-	case "passthrough":
-		return t.execCommon(stage, f, err)
+		return t.postExecJSON(stage, f, err)
+	case "cli", "verbose", "passthrough":
+		return t.postExecCommon(stage, f, err)
 	default:
 		return fmt.Errorf("unknown mode %q", t.config.Run.Mode)
 	}
 }
 
-func (t *Task) execJSON(stage string, f func(), err error) error {
+func (t *Task) postExecJSON(stage string, f func(), err error) error {
 	if err != nil {
 		t.log.Debug().Caller().Int("exit_status", t.cmd.ProcessState.ExitCode()).Msg("exited")
 		return errors.WithMessagef(err, "Failed to run %s", t.cmd)
@@ -185,9 +193,14 @@ func (t *Task) execJSON(stage string, f func(), err error) error {
 	}
 }
 
-func (t *Task) execCommon(stage string, f func(), err error) error {
+func (t *Task) postExecCommon(stage string, f func(), err error) error {
 	if err != nil {
-		return errors.WithMessagef(err, "Failed to run %s", t.cmd)
+		switch t.cmd.ProcessState.ExitCode() {
+		case 137:
+			return errors.WithMessagef(err, "Failed to run %s\nThis usually means it ran out of memory", t.cmd)
+		default:
+			return errors.WithMessagef(err, "Failed to run %s", t.cmd)
+		}
 	} else {
 		t.stage = stage
 		f()
@@ -214,22 +227,38 @@ func (t *Task) fail(err error) bool {
 	return true
 }
 
-func (t *Task) eval() error {
-	t.cmd = exec.Command("nix", "eval", "--raw",
-		t.config.Run.TaskFlake+"."+t.name+"."+t.config.Run.Runtime+".run.outPath")
-	t.preExec("eval")
-	buf := &bytes.Buffer{}
-	t.cmd.Stdout = buf
+func (t *Task) build() error {
+	t.cmd = exec.Command("nix", "build", "--json", "--no-link",
+		t.config.Run.TaskFlake+"."+t.name+"."+t.config.Run.Runtime+".run")
+
+	stderr := &bytes.Buffer{}
+	t.cmd.Stdout = stderr
+
+	t.preExec("build")
+
 	return t.exec("wait", func() {
-		t.storePath = buf.String() + "/bin/" + t.name + "-" + t.config.Run.Runtime
+		res := []nixBuildResult{}
+		err := json.Unmarshal(stderr.Bytes(), &res)
+		if err != nil {
+			fmt.Println(stderr.String())
+			fmt.Println(err)
+		}
+		t.storePath = fmt.Sprintf(
+			"%s/bin/%s-%s",
+			res[0].Outputs.Out,
+			t.name,
+			t.config.Run.Runtime,
+		)
 	})
 }
 
-func (t *Task) build() error {
-	t.cmd = exec.Command("nix", "build", "--no-link",
-		t.config.Run.TaskFlake+"."+t.name+"."+t.config.Run.Runtime+".run")
-	t.preExec("build")
-	return t.exec("wait", func() {})
+type nixBuildResult struct {
+	DrvPath string               `json:"drvPath"`
+	Outputs nixBuildResultOutput `json:"outputs"`
+}
+
+type nixBuildResultOutput struct {
+	Out string `json:"out"`
 }
 
 func (t *Task) run() error {

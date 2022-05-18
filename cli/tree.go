@@ -61,22 +61,30 @@ func (t *Tree) start() error {
 	return nil
 }
 
+func parseDag(dagFlake string) (map[string][]string, error) {
+	cmd := exec.Command("nix", "eval", "--json", dagFlake)
+	cmd.Stderr = os.Stderr
+
+	dagResult := map[string][]string{}
+	if output, err := cmd.Output(); err != nil {
+		return nil, errors.WithMessage(err, "running eval")
+	} else if err := json.Unmarshal(output, &dagResult); err != nil {
+		fmt.Println(string(output))
+		return nil, errors.WithMessage(err, "parsing eval result")
+	}
+
+	return dagResult, nil
+}
+
 func (t *Tree) eval() error {
 	if t.config.Run.runSpec == nil {
 		if t.config.Run.Mode == "passthrough" {
 			t.dagResult = map[string][]string{t.config.Run.Task: {}}
 		} else {
-			cmd := exec.Command("nix", "eval", "--json", t.config.Run.DagFlake)
-			cmd.Stderr = os.Stderr
-
-			dagResult := map[string][]string{}
-			if output, err := cmd.Output(); err != nil {
-				return errors.WithMessage(err, "running eval")
-			} else if err := json.Unmarshal(output, &dagResult); err != nil {
-				fmt.Println(string(output))
-				return errors.WithMessage(err, "parsing eval result")
+			dagResult, err := parseDag(t.config.Run.DagFlake)
+			if err != nil {
+				return err
 			}
-
 			t.dagResult = dagResult
 		}
 	} else {

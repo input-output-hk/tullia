@@ -6,8 +6,6 @@
     mkShell {
       nativeBuildInputs =
         cell.library.dependencies
-        ++ [
-          inputs.std.std.cli.default
-        ];
+        ++ [inputs.std.std.cli.default];
     };
 }

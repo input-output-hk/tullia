@@ -32,8 +32,9 @@ func (r RunSpec) MarshalZerologObject(event *zerolog.Event) {
 }
 
 type Config struct {
-	LogLevel string `arg:"--log-level" default:"trace" help:"one of trace,debug,info,warn,error,fatal,panic"`
+	LogLevel string `arg:"--log-level" default:"info" help:"one of trace,debug,info,warn,error,fatal,panic"`
 	Run      *Run   `arg:"subcommand:run" help:"execute the given task"`
+	List     *List  `arg:"subcommand:list" help:"show a list of available tasks"`
 	log      zerolog.Logger
 }
 
@@ -57,6 +58,15 @@ func (d Run) MarshalZerologObject(event *zerolog.Event) {
 	if d.runSpec != nil {
 		event.Object("RunSpec", d.runSpec)
 	}
+}
+
+type List struct {
+	DagFlake string `arg:"--dag-flake" default:".#tullia.x86_64-linux.dag"`
+	Style    string `arg:"--style" default:"compact" help:"one of compact,rounded,dotted,basic"`
+}
+
+func (d List) MarshalZerologObject(event *zerolog.Event) {
+	event.Str("DagFlake", d.DagFlake)
 }
 
 func Version() string {
@@ -98,6 +108,10 @@ func main() {
 	}
 
 	switch {
+	case config.List != nil:
+		if err := config.List.start(); err != nil {
+			log.Fatal().Err(err).Msg("starting list")
+		}
 	case config.Run != nil:
 		if len(config.Run.RunSpec) > 0 {
 			rs := &RunSpec{}

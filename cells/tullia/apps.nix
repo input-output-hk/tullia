@@ -14,7 +14,7 @@
   package = vendorSha256:
     inputs.nixpkgs.buildGoModule rec {
       pname = "tullia";
-      version = "2022.05.04.001";
+      version = "2022.05.18.001";
       inherit src vendorSha256;
 
       passthru.invalidHash =
@@ -34,7 +34,7 @@
       ];
     };
 in {
-  tullia = package "sha256-tSdJkdKEycm4AfpCHwmDNxVnNnglgDDctEP0Qy/ujK0=";
+  tullia = package "sha256-ui9Rjb/1wYUwIkx+lmjONE003ez3kwsUm9xvlmikEkg=";
 
   # Ugly wrapper script for `cue fmt` that adheres to the treefmt spec.
   # https://github.com/numtide/treefmt/issues/140

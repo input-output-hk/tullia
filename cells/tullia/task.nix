@@ -10,27 +10,46 @@ in {
   };
 
   lint = {config ? {}, ...}: {
-    command = ''
-      echo SHA is "$SHA"
-      echo linting go...
-      golangci-lint run
+    command = {
+      type = "bash";
+      text = ''
+        echo linting go...
+        golangci-lint run
 
-      echo linting nix...
-      fd -e nix -X alejandra -q -c
-    '';
-    after = ["tidy"];
+        echo linting nix...
+        fd -e nix -X alejandra -c
+      '';
+    };
     dependencies = with pkgs; [golangci-lint go gcc fd alejandra];
     env.SHA = config.action.facts.push.value.sha or "no sha";
   };
 
+  hello = {
+    command = {
+      type = "ruby";
+      text = ''
+        puts "Hello World!"
+        pp ENV
+      '';
+    };
+  };
+
   bump = {
     command = "ruby bump.rb";
-    after = ["lint"];
-    dependencies = with pkgs; [ruby];
+    after = ["tidy"];
+    dependencies = with pkgs; [ruby go gcc];
   };
 
   build = {
+    command = "go build -o tullia ./cli";
+    after = ["lint"];
+    dependencies = with pkgs; [go gcc];
+  };
+
+  nix-build = {
     command = "nix build";
-    after = ["bump"];
+    after = ["lint" "bump"];
+    dependencies = with pkgs; [go gcc git stdenv];
+    memory = 2 * 1024;
   };
 }

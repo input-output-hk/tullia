@@ -42,6 +42,56 @@
     storePaths = lib.splitString "\n" content;
   };
 
+  computeCommand = task: let
+    c = task.command;
+  in
+    if builtins.isString c
+    then c
+    else if builtins.isList c
+    then lib.escapeShellArgs c
+    else if c.type == "bash"
+    then "${pkgs.writeShellApplication {
+      name = task.name;
+      text = c.text;
+      runtimeInputs = task.dependencies;
+    }}/bin/${task.name}"
+    else if c.type == "ruby"
+    then "${writeRubyApplication {
+      name = task.name;
+      text = c.text;
+    }}/bin/${task.name}"
+    else throw "unreachable";
+
+  writeRubyApplication = {
+    name,
+    text,
+    runtimeInputs ? [],
+    checkPhase ? null,
+  }:
+    pkgs.writeTextFile {
+      inherit name;
+      executable = true;
+      destination = "/bin/${name}";
+      text = ''
+        #!${pkgs.ruby}/bin/ruby
+
+        ENV["PATH"] = '${lib.makeBinPath runtimeInputs}'
+
+        ${text}
+      '';
+
+      checkPhase =
+        if checkPhase == null
+        then ''
+          runHook preCheck
+          ${pkgs.ruby}/bin/ruby -c "$target"
+          runHook postCheck
+        ''
+        else checkPhase;
+
+      meta.mainProgram = name;
+    };
+
   # Define presets for tasks.
   # Every preset receives the old task config as an argument and returns
   # attributes to overwrite or add as the result.
@@ -72,7 +122,16 @@
         which
       ];
 
-      env = {
+      env = let
+        substituters = {
+          "http://alpha.fritz.box:7745/" = "kappa:Ffd0MaBUBrRsMCHsQ6YMmGO+tlh7EiHRFK2YfOTSwag=";
+          "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
+          "https://cachix.cachix.org" = "cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM=";
+          "https://hercules-ci.cachix.org" = "hercules-ci.cachix.org-1:ZZeDl9Va+xe9j+KqdzoBZMFJHVQ42Uu/c/1/KMC5Lw0=";
+          "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+          "https://manveru.cachix.org" = "manveru.cachix.org-1:L5nJHSinfA2K5dDCG3KAEadwf/e3qqhuBr7yCwSksXo=";
+        };
+      in {
         CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         HOME = "/local";
         NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
@@ -84,6 +143,8 @@
           log-lines = 1000
           show-trace = true
           sandbox = false
+          substituters = ${toString (builtins.attrNames substituters)}
+          trusted-public-keys = ${toString (builtins.attrValues substituters)}
         '';
       };
 
@@ -155,6 +216,20 @@
     };
   });
 
+  commandType = submodule ({config, ...}: let
+    command = config;
+  in {
+    options = {
+      type = mkOption {
+        type = enum ["bash" "ruby"];
+      };
+
+      text = mkOption {
+        type = str;
+      };
+    };
+  });
+
   taskType = submodule ({
     name,
     config,
@@ -201,7 +276,7 @@
       };
 
       command = mkOption {
-        type = either str (listOf str);
+        type = oneOf [str (listOf str) commandType];
       };
 
       dependencies = mkOption {
@@ -274,17 +349,18 @@
               type = package;
               default = pkgs.writeShellApplication {
                 inherit (task) name;
-                text = (
-                  if typeOf task.command == "string"
+                text =
+                  if builtins.isString task.command
                   then ''
                     set -x
                     ${task.command}
                   ''
-                  else ''
+                  else if builtins.isList task.command
+                  then ''
                     set -x
                     ${lib.escapeShellArgs task.command}
                   ''
-                );
+                  else computeCommand task;
               };
             };
 
@@ -722,15 +798,10 @@
               type = package;
               default = pkgs.writeShellApplication {
                 name = config.name;
-                text =
-                  if typeOf config.command == "string"
-                  then ''
-                    [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
-                    ${config.command}
-                  ''
-                  else ''
-                    exec ${lib.escapeShellArgs config.command}
-                  '';
+                text = ''
+                  [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
+                  exec ${computeCommand config}
+                '';
               };
             };
 
@@ -838,7 +909,7 @@
                 options = {
                   memMax = mkOption {
                     type = ints.unsigned;
-                    default = 0;
+                    default = task.memory * 1024 * 1024;
                     description = "Maximum number of bytes to use in the group. 0 is disabled";
                   };
 
@@ -934,19 +1005,11 @@
               default = pkgs.writeShellApplication {
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
-                text = (
-                  if typeOf task.command == "string"
-                  then ''
-                    set -x
-                    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                    ${task.command}
-                  ''
-                  else ''
-                    set -x
-                    ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                    exec ${lib.escapeShellArgs task.command}
-                  ''
-                );
+                text = ''
+                  set -x
+                  ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+                  ${computeCommand task}
+                '';
               };
             };
           };
