@@ -1,5 +1,3 @@
-package action
-
 import "struct"
 
 inputs: struct.MinFields(1) & {

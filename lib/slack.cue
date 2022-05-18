@@ -1,5 +1,3 @@
-package action
-
 _lib: slack: message?: {
 	#input: string | *"Slack Message"
 	#channels?: [...string]

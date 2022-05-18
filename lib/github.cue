@@ -1,5 +1,3 @@
-package action
-
 _lib: github: pull_request?: {
 	#input:   string | *"GitHub Pull Request"
 	#repo:    string
