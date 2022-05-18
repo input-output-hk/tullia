@@ -1177,12 +1177,11 @@
         type = path;
         apply = v: let
           def = pkgs.runCommand "def.cue" {nativeBuildInputs = [pkgs.cue];} ''
-            cue def \
+            cue def --simplify > $out \
               ${../lib/prelude.cue} \
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
-              ${v} \
-              > $out
+              ${v}
           '';
         in
           lib.fileContents def;
