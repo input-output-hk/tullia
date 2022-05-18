@@ -1,30 +1,42 @@
 package action
 
-_lib: github: pull_request: {
-	#input:  *null | string
-	#repo:   string
-	#target: string
+_lib: github: pull_request?: {
+	#input:   string | *"GitHub Pull Request"
+	#repo:    string
+	#target?: string
+	#target_default: bool | *false
 }
 
-if _lib.github.pull_request.#input != null {
-	let cfg = _lib.github.pull_request
+let cfg = _lib.github.pull_request
 
-	inputs: "\(cfg.#input)": "github-event": cfg & {
+if cfg != _|_ {
+	inputs: "\(cfg.#input)": match: "github-event": cfg & {
 		action: "opened" | "reopened" | "synchronize"
+
+		repository: full_name: cfg.#repo
+
 		pull_request: {
-			base: ref: cfg.#target
+			if cfg.#target != _|_ {
+				base: ref: cfg.#target
+			}
+
 			head: {
-				repo: full_name: cfg.#repo
+				repo: clone_url: string
 				sha: string
 			}
+
 			"_links": statuses: href: string
 		}
-		repository: full_name: cfg.#repo
+
+		if cfg.#target_default {
+			pull_request: base: ref: repository.default_branch
+			repository: default_branch: string
+		}
 	}
 
 	output: success: {
-		let event = _inputs["\(cfg.#input)"].value."github-event"
-		ok:       true
-		head_sha: event.pull_request.head.sha
+		let event = inputs[cfg.#input].value."github-event"
+		ok: true
+		head: sha: event.pull_request.head.sha
 	}
 }

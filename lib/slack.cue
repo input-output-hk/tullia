@@ -1,15 +1,15 @@
 package action
 
-_lib: slack: message: {
-	#input: *null | string
+_lib: slack: message?: {
+	#input: string | *"Slack Message"
 	#channels?: [...string]
 	#user?: string
 	#msg?:  string
 }
 
-if _lib.slack.message.#input != null {
-	let cfg = _lib.slack.message
+let cfg = _lib.slack.message
 
-	inputs: "\(cfg.#input)": cfg & {
+if cfg != _|_ {
+	inputs: "\(cfg.#input)": match: cfg & {
 	}
 }

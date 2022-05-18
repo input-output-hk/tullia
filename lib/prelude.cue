@@ -1,6 +1,18 @@
 package action
 
-_lib: [string]:    _
-inputs: [string]:  _
-output: [string]:  _
-_inputs: [string]: _
+import "struct"
+
+inputs: struct.MinFields(1) & {
+	[string]: {
+		match: {}
+		not?:      bool
+		optional?: bool
+	}
+}
+
+output?: {
+	success?: {}
+	failure?: {}
+}
+
+_lib: [string]: {}
