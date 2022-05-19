@@ -42,25 +42,65 @@
     storePaths = lib.splitString "\n" content;
   };
 
+  writers = {
+    bash = pkgs.writeShellApplication;
+    ruby = writeRubyApplication;
+    elvish = writeElvishApplication;
+  };
+
   computeCommand = task: let
-    c = task.command;
-  in
-    if builtins.isString c
-    then c
-    else if builtins.isList c
-    then lib.escapeShellArgs c
-    else if c.type == "bash"
-    then "${pkgs.writeShellApplication {
-      name = task.name;
-      text = c.text;
+    inherit (task) command name;
+    args = {
+      inherit name;
+      text =
+        if builtins.isPath command
+        then builtins.readFile command
+        else if builtins.isString command
+        then command
+        else if builtins.isList command
+        then lib.escapeShellArgs command
+        else if builtins.isAttrs command
+        then
+          if builtins.isPath command.text
+          then builtins.readFile command.text
+          else command.text
+        else throw "invalid command type in task ${name} it should be a path, string, list, or commandType";
       runtimeInputs = task.dependencies;
-    }}/bin/${task.name}"
-    else if c.type == "ruby"
-    then "${writeRubyApplication {
-      name = task.name;
-      text = c.text;
-    }}/bin/${task.name}"
-    else throw "unreachable";
+    };
+    mapWriter = n: v: "${v args}/bin/${name}";
+  in
+    (lib.mapAttrs mapWriter writers).${command.type or "bash"} or (throw "unreachable");
+
+  writeElvishApplication = {
+    name,
+    text,
+    runtimeInputs ? [],
+    checkPhase ? null,
+  }:
+    pkgs.writeTextFile {
+      inherit name;
+      executable = true;
+      destination = "/bin/${name}";
+      text = ''
+        #!${pkgs.elvish}/bin/elvish
+
+        set-env PATH '${lib.makeBinPath runtimeInputs}'
+        [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
+
+        ${text}
+      '';
+
+      checkPhase =
+        if checkPhase == null
+        then ''
+          runHook preCheck
+          ${pkgs.elvish}/bin/elvish -compileonly "$target"
+          runHook postCheck
+        ''
+        else checkPhase;
+
+      meta.mainProgram = name;
+    };
 
   writeRubyApplication = {
     name,
@@ -72,12 +112,39 @@
       inherit name;
       executable = true;
       destination = "/bin/${name}";
-      text = ''
+      text = let
+        file = pkgs.writeText "import.rb" text;
+      in ''
         #!${pkgs.ruby}/bin/ruby
+        require 'mkmf'
+        require "open3"
 
         ENV["PATH"] = '${lib.makeBinPath runtimeInputs}'
 
-        ${text}
+        # fake doing work
+        sleep 3
+        exit 0
+
+        def which(cmd)
+          exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : [''']
+          ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
+            exts.each do |ext|
+              exe = File.join(path, "#{cmd}#{ext}")
+              return exe if File.executable?(exe) && !File.directory?(exe)
+            end
+          end
+          nil
+        end
+
+        if File.exists?("/registration") && find_executable('nix-store')
+          Open3.popen2e("nix-store", "--load-db") do |si, _soe|
+            File.open("/registration") do |fd|
+              IO.copy_stream(fd, si)
+            end
+          end
+        end
+
+        require "${file}"
       '';
 
       checkPhase =
@@ -98,11 +165,46 @@
   # The result of the preset finally serves as the base of the module
   # evaluation that the user sees and can modify, so ensure proper precedence.
   presets = rec {
+    # used by all
+    base = {config, ...}: {
+      env = {
+        NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        HOME = "/local";
+        TERM = "xterm-256color";
+      };
+
+      workingDir = "/repo";
+      nsjail.env.USER = "nixbld1";
+      nsjail.mount."/tmp".options.size = 1024;
+
+      dependencies = with pkgs; [
+        bashInteractive
+        cacert
+        coreutils-full
+        curl
+        findutils
+        gitMinimal
+        gnugrep
+        gnutar
+        gzip
+        iana-etc
+        less
+        man
+        nix
+        shadow
+        wget
+        which
+      ];
+    };
+
     # You're on your own.
     empty = _: {};
 
     # A preset with enough to comfortably run Nix builds.
     ci = {config, ...}: {
+      imports = [base];
+
       dependencies = with pkgs; [
         bashInteractive
         cacert
@@ -126,16 +228,13 @@
         substituters = {
           "http://alpha.fritz.box:7745/" = "kappa:Ffd0MaBUBrRsMCHsQ6YMmGO+tlh7EiHRFK2YfOTSwag=";
           "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-          "https://cachix.cachix.org" = "cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM=";
-          "https://hercules-ci.cachix.org" = "hercules-ci.cachix.org-1:ZZeDl9Va+xe9j+KqdzoBZMFJHVQ42Uu/c/1/KMC5Lw0=";
           "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
-          "https://manveru.cachix.org" = "manveru.cachix.org-1:L5nJHSinfA2K5dDCG3KAEadwf/e3qqhuBr7yCwSksXo=";
         };
       in {
         CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         HOME = "/local";
         NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-        PATH = lib.makeBinPath config.dependencies;
+        # PATH = lib.makeBinPath config.dependencies;
         TERM = "xterm-256color";
         # TODO: real options for this?
         NIX_CONFIG = ''
@@ -147,11 +246,6 @@
           trusted-public-keys = ${toString (builtins.attrValues substituters)}
         '';
       };
-
-      workingDir = "/repo";
-
-      nsjail.env.USER = "nixbld1";
-      nsjail.mount."/tmp".options.size = 1024;
     };
   };
 
@@ -221,11 +315,11 @@
   in {
     options = {
       type = mkOption {
-        type = enum ["bash" "ruby"];
+        type = enum (lib.attrNames writers);
       };
 
       text = mkOption {
-        type = str;
+        type = either str path;
       };
     };
   });
@@ -304,7 +398,7 @@
 
       preset = mkOption {
         type = enum (lib.attrNames presets);
-        default = "ci";
+        default = "base";
       };
 
       run = mkOption {
@@ -349,18 +443,7 @@
               type = package;
               default = pkgs.writeShellApplication {
                 inherit (task) name;
-                text =
-                  if builtins.isString task.command
-                  then ''
-                    set -x
-                    ${task.command}
-                  ''
-                  else if builtins.isList task.command
-                  then ''
-                    set -x
-                    ${lib.escapeShellArgs task.command}
-                  ''
-                  else computeCommand task;
+                text = computeCommand task;
               };
             };
 
@@ -427,7 +510,7 @@
 
             maxLayers = mkOption {
               type = ints.positive;
-              default = 1;
+              default = 30;
               description = ''
                 The maximun number of layer to create. This is based on the
                 store path "popularity" as described in
@@ -749,12 +832,12 @@
                   bindmount = c.bindmount.rw;
                   bindmount_ro = c.bindmount.ro;
                   mount = toMountFlag c.mount;
-                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") config.env;
+                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") (pp config.env);
                 };
               in
                 pkgs.writeShellApplication {
                   name = "${config.name}-nsjail";
-                  runtimeInputs = with pkgs; [coreutils-full nsjail];
+                  runtimeInputs = with pkgs; [coreutils nsjail];
                   text = ''
                     # TODO: This is tied to systemd... find a way to make it cross-platform.
                     uid="''${UID:-$(id -u)}"
@@ -769,7 +852,7 @@
                     root="$(mktemp -d -t root.XXXXXXXXXX)"
                     mkdir -p "$root"/{etc,tmp,local,bin,usr/bin}
                     ln -s ${pkgs.bashInteractive}/bin/sh "$root/bin/sh"
-                    ln -s ${pkgs.coreutils-full}/usr/bin/env "$root/usr/bin/env"
+                    ln -s ${pkgs.coreutils}/usr/bin/env "$root/usr/bin/env"
 
                     function finish {
                       status="$?"
@@ -800,7 +883,7 @@
                 name = config.name;
                 text = ''
                   [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
-                  exec ${computeCommand config}
+                  ${computeCommand config}
                 '';
               };
             };
@@ -1006,7 +1089,6 @@
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
                 text = ''
-                  set -x
                   ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
                   ${computeCommand task}
                 '';
@@ -1194,7 +1276,6 @@ in {
           value = {
             dependencies = with pkgs; [tullia];
             command = ''
-              set -x
               exec tullia run ${n} --run-spec ${spec} --mode passthrough --runtime unwrapped
             '';
             nsjail.setsid = true;

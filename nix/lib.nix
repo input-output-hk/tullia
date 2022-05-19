@@ -9,7 +9,6 @@ inputs: let
     };
 
   evalAction = {
-    actions,
     tasks,
     rootDir ? null,
   }: system: action: let
@@ -29,7 +28,7 @@ inputs: let
               _file = ./lib.nix;
               _module.args = {inherit pkgs rootDir ociRegistry;};
               inherit action;
-              task = tasks.${system};
+              task = tasks;
             }
             {
               task =
@@ -39,7 +38,7 @@ inputs: let
                     facts = inputs;
                   };
                 })
-                tasks.${system};
+                tasks;
             }
           ];
         })
@@ -67,20 +66,27 @@ inputs: let
     .config;
 in rec {
   ciceroFromStd = args:
-    builtins.mapAttrs (evalAction args) args.actions;
+    builtins.mapAttrs (
+      system: actions: (
+        builtins.mapAttrs (
+          actionName: action: let
+            inner =
+              evalAction {tasks = args.tasks.${system};} system {${actionName} = action;};
+          in
+            further: (inner ({name = actionName;} // further)).action.${actionName}
+        )
+        actions
+      )
+    )
+    args.actions;
 
-  tulliaFromStd = args:
-    builtins.mapAttrs (evalTask args) args.tasks;
+  tulliaFromStd = {tasks, ...}:
+    builtins.mapAttrs (evalTask {inherit tasks;}) tasks;
 
   fromStd = args: {
-    tullia = tulliaFromStd {
-      inherit (args) tasks;
-      rootDir = args.rootDir or null;
-    };
-
-    cicero = ciceroFromStd {
-      inherit (args) actions tasks;
-      rootDir = args.rootDir or null;
-    };
+    # nix run .#tullia.x86_64-linux.task.goodbye.run
+    tullia = tulliaFromStd args;
+    # nix eval --json .#cicero.x86_64-linux.ci --apply 'a: a { id = 1; inputs = {}; ociRegistry = ""; }'
+    cicero = ciceroFromStd args;
   };
 }

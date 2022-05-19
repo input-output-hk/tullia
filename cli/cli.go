@@ -107,28 +107,28 @@ func (m *CLIModel) View() string {
 		switch task.stage {
 		case "wait":
 			color = blue
-			line = fmt.Sprintf("[%s] %5s %s", "+", task.stage, taskName)
+			line = fmt.Sprintf("[%s] %-6s %s", "+", task.stage, taskName)
 			durationOut = fmt.Sprintf("%3.1fs", duration.Seconds())
 		case "build", "run":
 			color = teal
-			line = fmt.Sprintf("[%s] %5s %s", "+", task.stage, taskName)
+			line = fmt.Sprintf("[%s] %-6s %s", "+", task.stage, taskName)
 			durationOut = fmt.Sprintf("%3.1fs", duration.Seconds())
 		case "error":
 			color = red
-			line = fmt.Sprintf("[%s] %5s %s", "✗", task.stage, taskName)
+			line = fmt.Sprintf("[%s] %-6s %s", "✗", task.stage, taskName)
 			durationOut = duration.String()
 		case "cancel":
 			color = teal
-			line = fmt.Sprintf("[%s] %5s %s", "✗", task.stage, taskName)
+			line = fmt.Sprintf("[%s] %-6s %s", "✗", task.stage, taskName)
 			durationOut = "0.0s"
 		case "done":
 			color = green
-			line = fmt.Sprintf("[%s] %5s %s", "✔", task.stage, taskName)
+			line = fmt.Sprintf("[%s] %-6s %s", "✔", task.stage, taskName)
 			durationOut = duration.String()
 		}
 
 		timestamp := styleDuration.Render(durationOut)
-		width := min(m.width-lipgloss.Width(timestamp), taskNameLen+10)
+		width := min(m.width-lipgloss.Width(timestamp), taskNameLen+11)
 		styleLeft := lipgloss.NewStyle().Width(width)
 
 		lines = append(lines, styleLine.Foreground(color).Render(

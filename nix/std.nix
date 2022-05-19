@@ -6,7 +6,6 @@ inputs: name: {
     flake,
     fragment,
     fragmentRelPath,
-    cell,
   }: let
     pkgs = inputs.nixpkgs.legacyPackages.${system};
     inherit (pkgs) lib;
@@ -33,11 +32,25 @@ inputs: name: {
     mkAction = runtime: {
       name = runtime;
       description = "run this task in ${runtime}";
-      command = ["${runner runtime}/bin/run-${taskName}"];
+      command = "${runner runtime}/bin/run-${taskName}";
     };
 
     nsjailSpec = mkAction "nsjail";
     podmanSpec = mkAction "podman";
+
+    actions = map mkAction ["nsjail" "podman"];
   in
-    map mkAction ["nsjail" "podman"];
+    actions
+    ++ [
+      {
+        name = "copyToPodman";
+        description = "Push image of this task to local podman";
+        command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToPodman";
+      }
+      {
+        name = "copyToRegistry";
+        description = "Push image of this task to remote registry";
+        command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToRegistry";
+      }
+    ];
 }

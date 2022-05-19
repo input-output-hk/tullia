@@ -3,9 +3,6 @@
   inputs,
 }: let
   inherit (builtins) toJSON trace;
-  pp = a: pp2 a a;
-  pp2 = a: b: trace (toJSON a) b;
-
   inherit (inputs.nixpkgs.lib) evalModules filterAttrs mapAttrs;
   inherit (inputs.nix2container.packages.nix2container) buildImage;
 
@@ -66,10 +63,13 @@
     .config;
 
   dependencies = with pkgs; [
+    coreutils
+    gitMinimal
     alejandra
     cell.apps.treefmt-cue
     cue
     fd
+    nix
     gcc
     go
     gocode
@@ -82,6 +82,6 @@
   ];
   # evaluated = evalTasks tasks;
 in {
-  inherit pp pp2 evalTasks evalActions dependencies;
+  inherit evalTasks evalActions dependencies;
   # inherit (evaluated) task dag;
 }

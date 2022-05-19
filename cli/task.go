@@ -238,11 +238,10 @@ func (t *Task) build() error {
 
 	return t.exec("wait", func() {
 		res := []nixBuildResult{}
-		err := json.Unmarshal(stderr.Bytes(), &res)
-		if err != nil {
-			fmt.Println(stderr.String())
-			fmt.Println(err)
+		if err := json.Unmarshal(stderr.Bytes(), &res); err != nil {
+			t.log.Err(err).Str("stderr", stderr.String()).Msg("waiting for result")
 		}
+
 		t.storePath = fmt.Sprintf(
 			"%s/bin/%s-%s",
 			res[0].Outputs.Out,

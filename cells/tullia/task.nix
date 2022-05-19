@@ -3,10 +3,16 @@
   inputs,
 }: let
   pkgs = inputs.nixpkgs;
+  inherit (cell.library) dependencies;
 in {
   tidy = {
-    command = "go mod tidy -v";
-    dependencies = with pkgs; [go gcc];
+    command = {
+      type = "bash";
+      text = ''
+        go mod tidy -v
+      '';
+    };
+    inherit dependencies;
   };
 
   lint = {config ? {}, ...}: {
@@ -20,7 +26,7 @@ in {
         fd -e nix -X alejandra -c
       '';
     };
-    dependencies = with pkgs; [golangci-lint go gcc fd alejandra];
+    inherit dependencies;
     env.SHA = config.action.facts.push.value.sha or "no sha";
   };
 
@@ -29,27 +35,38 @@ in {
       type = "ruby";
       text = ''
         puts "Hello World!"
-        pp ENV
+      '';
+    };
+  };
+
+  goodbye = {
+    command = {
+      type = "elvish";
+      text = ''
+        echo "goodbye"
       '';
     };
   };
 
   bump = {
-    command = "ruby bump.rb";
+    command = {
+      type = "ruby";
+      text = ./bump.rb;
+    };
     after = ["tidy"];
-    dependencies = with pkgs; [ruby go gcc];
+    inherit dependencies;
   };
 
   build = {
     command = "go build -o tullia ./cli";
     after = ["lint"];
-    dependencies = with pkgs; [go gcc];
+    inherit dependencies;
   };
 
   nix-build = {
     command = "nix build";
     after = ["lint" "bump"];
-    dependencies = with pkgs; [go gcc git stdenv];
+    inherit dependencies;
     memory = 2 * 1024;
   };
 }

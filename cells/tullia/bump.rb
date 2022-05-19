@@ -7,7 +7,7 @@ require 'open3'
 require 'English'
 
 pkg = '.#defaultPackage.x86_64-linux'
-attrs = `nix eval --json "#{pkg}" --apply 'p: { inherit (p) vendorSha256 version; }'`
+attrs = `nix eval --json "#{pkg}" --apply 'p: { inherit (p) vendorSha256 version; }' --extra-experimental-features "nix-command flakes"`
 raise "couldn't get package info" unless $CHILD_STATUS.success?
 
 old_sha, version = JSON.parse(attrs).values_at('vendorSha256', 'version')
@@ -32,8 +32,16 @@ puts 'Checking vendorSha256...'
 
 new_sha = nil
 
-Open3.popen3('nix', '-L', 'build', "#{pkg}.invalidHash") do |_si, _so, se|
+Open3.popen3(
+  'nix', '-L',
+  '--extra-experimental-features', 'nix-command flakes',
+  'build', "#{pkg}.invalidHash"
+) do |_si, so, se|
+  so.each_line do |line|
+    pp so: line
+  end
   se.each_line do |line|
+    pp se: line
     new_sha = $LAST_MATCH_INFO[:sha] if line =~ /^\s+got:\s+(?<sha>sha256-\S+)$/
   end
 end
