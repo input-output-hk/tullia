@@ -84,8 +84,12 @@
       text = ''
         #!${pkgs.elvish}/bin/elvish
 
-        set-env PATH '${lib.makeBinPath runtimeInputs}'
-        [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
+        use path
+
+        set paths = ${lib.escapeShellArgs runtimeInputs}
+        if (and (path:is-regular /registration) (has-external nix-store)) {
+          nix-store --load-db < /registration
+        }
 
         ${text}
       '';
