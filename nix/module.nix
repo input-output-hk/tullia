@@ -1212,8 +1212,9 @@
                       taskName: task:
                         if task.config ? image
                         then {
+                          type = "nix2container";
                           name = getImageName task.config.image;
-                          configDrv = task.config.image.drvPath;
+                          imageDrv = task.config.image.drvPath;
                         }
                         else null
                     )
