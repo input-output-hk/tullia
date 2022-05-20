@@ -305,7 +305,7 @@
 
       config =
         if task.nomad.driver == "podman"
-        then {image = lib.mkDefault (task.oci.image // {toString = getImageName task.oci.image;});}
+        then {image = lib.mkDefault (task.oci.image // {__toString = _: getImageName task.oci.image;});}
         else throw "Driver '${task.nomad.driver}' not supported yet";
     };
   });
