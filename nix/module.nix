@@ -84,10 +84,8 @@
       text = ''
         #!${pkgs.elvish}/bin/elvish
 
-        use path
-
         set paths = ${lib.escapeShellArgs runtimeInputs}
-        if (and (path:is-regular /registration) (has-external nix-store)) {
+        if (and ?(test -s /registration) (has-external nix-store)) {
           nix-store --load-db < /registration
         }
 
@@ -124,10 +122,6 @@
         require "open3"
 
         ENV["PATH"] = '${lib.makeBinPath runtimeInputs}'
-
-        # fake doing work
-        sleep 3
-        exit 0
 
         def which(cmd)
           exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : [''']
@@ -176,6 +170,12 @@
         CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         HOME = "/local";
         TERM = "xterm-256color";
+        NIX_CONFIG = ''
+          experimental-features = ca-derivations flakes nix-command
+          log-lines = 1000
+          show-trace = true
+          sandbox = false
+        '';
       };
 
       workingDir = "/repo";

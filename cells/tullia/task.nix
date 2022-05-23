@@ -65,7 +65,15 @@ in {
 
   nix-build = {
     command = "nix build";
-    after = ["lint" "bump"];
+    after.successOf = ["lint" "bump"];
+    after.failureOf = ["lint" "bump"];
+    inherit dependencies;
+    memory = 2 * 1024;
+  };
+
+  github-status-failure = {
+    command = "tullia github fail";
+    after.failureOf = ["lint" "bump" "nix-build"];
     inherit dependencies;
     memory = 2 * 1024;
   };
