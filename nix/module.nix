@@ -24,24 +24,6 @@
 
   moduleConfig = config;
 
-  getClosure = {
-    script,
-    env,
-  }: let
-    closure =
-      pkgs.closureInfo
-      {
-        rootPaths = {
-          inherit script;
-          env = pkgs.writeTextDir "nix-support/env" (toJSON env);
-        };
-      };
-    content = lib.fileContents "${closure}/store-paths";
-  in {
-    inherit closure;
-    storePaths = lib.splitString "\n" content;
-  };
-
   writers = {
     shell = pkgs.callPackage ./writer/shell.nix {};
     elvish = pkgs.callPackage ./writer/elvish.nix {};
@@ -134,30 +116,31 @@
     };
   });
 
-  commandType = submodule ({config, ...}: let
-    command = config;
-  in {
-    options = {
-      type = mkOption {
-        type = enum (lib.attrNames writers);
-        default = "shell";
-      };
+  commandType = task:
+    submodule ({config, ...}: let
+      command = config;
+    in {
+      options = {
+        type = mkOption {
+          type = enum (lib.attrNames writers);
+          default = "shell";
+        };
 
-      runtimeInputs = mkOption {
-        type = listOf package;
-        default = [];
-      };
+        runtimeInputs = mkOption {
+          type = listOf package;
+          default = task.dependencies;
+        };
 
-      checkPhase = mkOption {
-        type = bool;
-        default = true;
-      };
+        check = mkOption {
+          type = bool;
+          default = true;
+        };
 
-      text = mkOption {
-        type = either str path;
+        text = mkOption {
+          type = either str path;
+        };
       };
-    };
-  });
+    });
 
   taskType = submodule ({
     name,
@@ -175,9 +158,8 @@
     imports =
       [
         {
-          _module.args = {
-            inherit pkgs;
-          };
+          _module.args = {inherit pkgs;};
+          preset.bash.enable = lib.mkDefault true;
         }
       ]
       ++ (lib.attrValues presets);
@@ -225,12 +207,27 @@
       };
 
       command = mkOption {
-        type = commandType;
+        type = commandType task;
       };
 
       commands = mkOption {
-        type = listOf commandType;
+        type = listOf (commandType task);
         default = [task.command];
+      };
+
+      computedCommand = mkOption {
+        type = package;
+        readOnly = true;
+        default = computeCommand task;
+      };
+
+      closure = mkOption {
+        type = attrsOf (either (listOf package) package);
+        readOnly = true;
+        default = pkgs.getClosure {
+          script = task.computedCommand;
+          env = task.env;
+        };
       };
 
       dependencies = mkOption {
@@ -272,7 +269,7 @@
 
       workingDir = mkOption {
         type = str;
-        default = "/local";
+        default = "/repo";
       };
 
       oci = mkOption {
@@ -290,14 +287,6 @@
               type = package;
               default = pkgs.buildImage {
                 inherit (task.oci) name tag maxLayers contents config;
-              };
-            };
-
-            innerScript = mkOption {
-              type = package;
-              default = writers.shell {
-                inherit (task) name;
-                text = "${computeCommand task}/bin/${task.name}";
               };
             };
 
@@ -551,15 +540,10 @@
           };
 
           config = let
-            inherit
-              (getClosure {
-                script = task.oci.innerScript;
-                env = task.oci.config.Env;
-              })
-              closure
-              ;
+            script = computeCommand task;
+            inherit (task.closure) closure;
           in {
-            layers = lib.mkDefault ([rootDir closure] ++ task.dependencies);
+            layers = lib.mkDefault [rootDir];
 
             contents = lib.mkDefault [
               (pkgs.symlinkJoin {
@@ -568,7 +552,7 @@
               })
             ];
 
-            cmd = lib.mkDefault ["${task.oci.innerScript}/bin/${task.name}"];
+            cmd = lib.mkDefault ["${script}/bin/${task.name}"];
             env = lib.mapAttrs (key: value: lib.mkDefault value) task.env;
             volumes."/local" = lib.mkDefault true;
             volumes."/tmp" = lib.mkDefault true;
@@ -773,29 +757,12 @@
                 options = {
                   rw = mkOption {
                     type = listOf str;
-                    default = [
-                      ''"$root:/"''
-                      "/dev"
-                      ''"$alloc:/alloc"''
-                      ''"$HOME/.docker/config.json:/local/.docker/config.json"''
-                      ''"$HOME/.netrc:/local/.netrc"''
-                      ''"$PWD:/repo"''
-                    ];
+                    default = [];
                   };
 
                   ro = mkOption {
                     type = listOf str;
-                    default = let
-                      inherit
-                        (getClosure {
-                          script = computeCommand task;
-                          env = config.env;
-                        })
-                        closure
-                        storePaths
-                        ;
-                    in
-                      ["${closure}/registration:/registration"] ++ storePaths ++ ["/etc/resolv.conf:/etc/resolv.conf"];
+                    default = [];
                   };
                 };
               };

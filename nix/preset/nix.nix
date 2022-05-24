@@ -7,6 +7,13 @@
   options.preset.nix.enable = lib.mkEnableOption "nix preset";
 
   config = lib.mkIf config.preset.nix.enable {
+    nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
+    nsjail.env.USER = lib.mkDefault "nixbld1";
+    nsjail.bindmount.ro = let
+      inherit (config.closure) closure;
+    in
+      lib.mkDefault ["${closure}/registration:/registration"];
+
     dependencies = with pkgs;
       lib.mkDefault [
         bashInteractive
@@ -34,12 +41,6 @@
         "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
       };
     in {
-      CURL_CA_BUNDLE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      HOME = lib.mkDefault "/local";
-      NIX_SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      # PATH = lib.makeBinPath config.dependencies;
-      TERM = lib.mkDefault "xterm-256color";
       # TODO: real options for this?
       NIX_CONFIG = lib.mkDefault ''
         experimental-features = ca-derivations flakes nix-command

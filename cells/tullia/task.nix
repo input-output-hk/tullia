@@ -20,9 +20,8 @@ in {
       echo linting nix...
       fd -e nix -X alejandra -c
     '';
-    command.check = false;
     inherit dependencies;
-    env.SHA = config.action.facts.push.value.sha or "no sha";
+    # env.SHA = config.action.facts.push.value.sha or "no sha";
   };
 
   hello = {

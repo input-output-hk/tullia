@@ -1,12 +1,29 @@
 inputs: let
-  inherit (inputs.nixpkgs.lib) evalModules filterAttrs mapAttrs;
+  inherit (inputs.nixpkgs.lib) evalModules filterAttrs mapAttrs fileContents splitString;
 
-  augmentPkgs = system:
-    inputs.nixpkgs.legacyPackages.${system}
-    // {
-      tullia = inputs.self.defaultPackage.${system};
-      inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
+  augmentPkgs = system: (let
+    pkgs = inputs.nixpkgs.legacyPackages.${system};
+    tullia = inputs.self.defaultPackage.${system};
+    inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
+    getClosure = {
+      script,
+      env,
+    }: let
+      closure =
+        pkgs.closureInfo
+        {
+          rootPaths = {
+            inherit script;
+            env = pkgs.writeTextDir "nix-support/env" (builtins.toJSON env);
+          };
+        };
+      content = fileContents "${closure}/store-paths";
+    in {
+      inherit closure;
+      storePaths = splitString "\n" content;
     };
+  in
+    pkgs // {inherit buildImage getClosure;});
 
   evalAction = {
     tasks,
