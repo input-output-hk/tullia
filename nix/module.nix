@@ -169,6 +169,7 @@
     presets = {
       nix = import ./preset/nix.nix;
       bash = import ./preset/bash.nix;
+      github-ci = import ./preset/github-ci.nix;
     };
   in {
     imports =

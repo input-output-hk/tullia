@@ -47,7 +47,6 @@ in {
         echo "goodbye"
       '';
     };
-    after = ["git-clone"];
   };
 
   bump = {
