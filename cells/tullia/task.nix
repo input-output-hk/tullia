@@ -71,9 +71,9 @@ in {
 
     preset.nix.enable = true;
     preset.github-ci = {
-      enable = true;
+      enable = config ? facts;
       repo = "input-output-hk/tullia";
-      inherit (config.facts.push.value) sha;
+      sha = config.facts.push.value.sha or null;
     };
   };
 
