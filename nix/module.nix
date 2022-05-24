@@ -43,215 +43,35 @@
   };
 
   writers = {
-    bash = pkgs.writeShellApplication;
-    ruby = writeRubyApplication;
-    elvish = writeElvishApplication;
+    shell = pkgs.callPackage ./writer/shell.nix {};
+    elvish = pkgs.callPackage ./writer/elvish.nix {};
+    ruby = pkgs.callPackage ./writer/ruby.nix {};
   };
 
   computeCommand = task: let
-    inherit (task) command name;
-    args = {
-      inherit name;
-      text =
-        if builtins.isPath command
-        then builtins.readFile command
-        else if builtins.isString command
-        then command
-        else if builtins.isList command
-        then lib.escapeShellArgs command
-        else if builtins.isAttrs command
-        then
-          if builtins.isPath command.text
-          then builtins.readFile command.text
-          else command.text
-        else throw "invalid command type in task ${name} it should be a path, string, list, or commandType";
-      runtimeInputs = task.dependencies;
-    };
-    mapWriter = n: v: "${v args}/bin/${name}";
+    inherit (task) commands name;
+
+    # TODO: some writers may prefer a file path?
+    getText = text:
+      if builtins.isPath text
+      then builtins.readFile text
+      else text;
+
+    makeCommand = idx: command:
+      writers.${command.type} {
+        inherit name;
+        inherit (command) runtimeInputs;
+        text = getText command.text;
+      };
+
+    mapCommand = idx: command: "${makeCommand idx command}/bin/${name}";
+
+    commandsWrapped = lib.concatImapStringsSep "\n" mapCommand task.commands;
   in
-    (lib.mapAttrs mapWriter writers).${command.type or "bash"} or (throw "unreachable");
-
-  writeElvishApplication = {
-    name,
-    text,
-    runtimeInputs ? [],
-    checkPhase ? null,
-  }:
-    pkgs.writeTextFile {
+    writers.shell {
       inherit name;
-      executable = true;
-      destination = "/bin/${name}";
-      text = ''
-        #!${pkgs.elvish}/bin/elvish
-
-        set paths = ${lib.escapeShellArgs runtimeInputs}
-        if (and ?(test -s /registration) (has-external nix-store)) {
-          nix-store --load-db < /registration
-        }
-
-        ${text}
-      '';
-
-      checkPhase =
-        if checkPhase == null
-        then ''
-          runHook preCheck
-          ${pkgs.elvish}/bin/elvish -compileonly "$target"
-          runHook postCheck
-        ''
-        else checkPhase;
-
-      meta.mainProgram = name;
+      text = commandsWrapped;
     };
-
-  writeRubyApplication = {
-    name,
-    text,
-    runtimeInputs ? [],
-    checkPhase ? null,
-  }:
-    pkgs.writeTextFile {
-      inherit name;
-      executable = true;
-      destination = "/bin/${name}";
-      text = let
-        file = pkgs.writeText "import.rb" text;
-      in ''
-        #!${pkgs.ruby}/bin/ruby
-        require 'mkmf'
-        require "open3"
-
-        ENV["PATH"] = '${lib.makeBinPath runtimeInputs}'
-
-        def which(cmd)
-          exts = ENV['PATHEXT'] ? ENV['PATHEXT'].split(';') : [''']
-          ENV['PATH'].split(File::PATH_SEPARATOR).each do |path|
-            exts.each do |ext|
-              exe = File.join(path, "#{cmd}#{ext}")
-              return exe if File.executable?(exe) && !File.directory?(exe)
-            end
-          end
-          nil
-        end
-
-        if File.exists?("/registration") && find_executable('nix-store')
-          Open3.popen2e("nix-store", "--load-db") do |si, _soe|
-            File.open("/registration") do |fd|
-              IO.copy_stream(fd, si)
-            end
-          end
-        end
-
-        require "${file}"
-      '';
-
-      checkPhase =
-        if checkPhase == null
-        then ''
-          runHook preCheck
-          ${pkgs.ruby}/bin/ruby -c "$target"
-          runHook postCheck
-        ''
-        else checkPhase;
-
-      meta.mainProgram = name;
-    };
-
-  # Define presets for tasks.
-  # Every preset receives the old task config as an argument and returns
-  # attributes to overwrite or add as the result.
-  # The result of the preset finally serves as the base of the module
-  # evaluation that the user sees and can modify, so ensure proper precedence.
-  presets = rec {
-    # used by all
-    base = {config, ...}: {
-      env = {
-        NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-        CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-        HOME = "/local";
-        TERM = "xterm-256color";
-        NIX_CONFIG = ''
-          experimental-features = ca-derivations flakes nix-command
-          log-lines = 1000
-          show-trace = true
-          sandbox = false
-        '';
-      };
-
-      workingDir = "/repo";
-      nsjail.env.USER = "nixbld1";
-      nsjail.mount."/tmp".options.size = 1024;
-
-      dependencies = with pkgs; [
-        bashInteractive
-        cacert
-        coreutils-full
-        curl
-        findutils
-        gitMinimal
-        gnugrep
-        gnutar
-        gzip
-        iana-etc
-        less
-        man
-        nix
-        shadow
-        wget
-        which
-      ];
-    };
-
-    # You're on your own.
-    empty = _: {};
-
-    # A preset with enough to comfortably run Nix builds.
-    ci = {config, ...}: {
-      imports = [base];
-
-      dependencies = with pkgs; [
-        bashInteractive
-        cacert
-        coreutils-full
-        curl
-        findutils
-        gitMinimal
-        gnugrep
-        gnutar
-        gzip
-        iana-etc
-        less
-        man
-        nix
-        shadow
-        wget
-        which
-      ];
-
-      env = let
-        substituters = {
-          "http://alpha.fritz.box:7745/" = "kappa:Ffd0MaBUBrRsMCHsQ6YMmGO+tlh7EiHRFK2YfOTSwag=";
-          "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-          "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
-        };
-      in {
-        CURL_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-        HOME = "/local";
-        NIX_SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-        # PATH = lib.makeBinPath config.dependencies;
-        TERM = "xterm-256color";
-        # TODO: real options for this?
-        NIX_CONFIG = ''
-          experimental-features = ca-derivations flakes nix-command
-          log-lines = 1000
-          show-trace = true
-          sandbox = false
-          substituters = ${toString (builtins.attrNames substituters)}
-          trusted-public-keys = ${toString (builtins.attrValues substituters)}
-        '';
-      };
-    };
-  };
 
   taskNomadType = task: (submodule {
     options = {
@@ -320,6 +140,17 @@
     options = {
       type = mkOption {
         type = enum (lib.attrNames writers);
+        default = "shell";
+      };
+
+      runtimeInputs = mkOption {
+        type = listOf package;
+        default = [];
+      };
+
+      checkPhase = mkOption {
+        type = bool;
+        default = true;
       };
 
       text = mkOption {
@@ -335,8 +166,27 @@
     ...
   }: let
     task = config;
+    presets = {
+      nix = import ./preset/nix.nix;
+      bash = import ./preset/bash.nix;
+    };
   in {
+    imports =
+      [
+        {
+          _module.args = {
+            inherit pkgs;
+          };
+        }
+      ]
+      ++ (lib.attrValues presets);
+
     options = {
+      enable = mkOption {
+        type = anything;
+        default = true;
+      };
+
       after = mkOption {
         type = listOf str;
         default = [];
@@ -374,7 +224,12 @@
       };
 
       command = mkOption {
-        type = oneOf [str (listOf str) commandType];
+        type = commandType;
+      };
+
+      commands = mkOption {
+        type = listOf commandType;
+        default = [task.command];
       };
 
       dependencies = mkOption {
@@ -384,10 +239,9 @@
 
       env = mkOption {
         type = attrsOf str;
-        default = let
-          preset = presets.${config.preset} {inherit config;};
-        in
-          lib.mapAttrs (key: value: lib.mkDefault value) (preset.env or {});
+        default = {
+          SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+        };
       };
 
       memory = mkOption {
@@ -398,11 +252,6 @@
       name = mkOption {
         type = strMatching "^[[:alnum:]-]+$";
         default = name;
-      };
-
-      preset = mkOption {
-        type = enum (lib.attrNames presets);
-        default = "base";
       };
 
       run = mkOption {
@@ -445,7 +294,7 @@
 
             innerScript = mkOption {
               type = package;
-              default = pkgs.writeShellApplication {
+              default = writers.shell {
                 inherit (task) name;
                 text = computeCommand task;
               };
@@ -755,7 +604,7 @@
                 };
                 imageName = getImageName config.oci.image;
               in
-                pkgs.writeShellApplication {
+                writers.shell {
                   name = "${config.name}-podman";
                   runtimeInputs = [pkgs.coreutils-full pkgs.podman config.oci.image.copyTo];
                   text = ''
@@ -836,10 +685,10 @@
                   bindmount = c.bindmount.rw;
                   bindmount_ro = c.bindmount.ro;
                   mount = toMountFlag c.mount;
-                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") (pp config.env);
+                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") (config.env);
                 };
               in
-                pkgs.writeShellApplication {
+                writers.shell {
                   name = "${config.name}-nsjail";
                   runtimeInputs = with pkgs; [coreutils nsjail];
                   text = ''
@@ -876,20 +725,9 @@
                       --group "$gid" \
                       ''${cgroupV2Mount:+--use_cgroupv2} \
                       ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${c.innerScript}/bin/${config.name}"}
+                      -- ${lib.escapeShellArg "${computeCommand task}/bin/${config.name}"}
                   '';
                 };
-            };
-
-            innerScript = mkOption {
-              type = package;
-              default = pkgs.writeShellApplication {
-                name = config.name;
-                text = ''
-                  [ -s /registration ] && command -v nix-store >/dev/null && nix-store --load-db < /registration
-                  ${computeCommand config}
-                '';
-              };
             };
 
             setsid = mkOption {
@@ -949,7 +787,7 @@
                     default = let
                       inherit
                         (getClosure {
-                          script = config.nsjail.innerScript;
+                          script = computeCommand task;
                           env = config.env;
                         })
                         closure
@@ -1070,13 +908,6 @@
               };
             };
           };
-
-          config = {
-            mount = {
-              # "/local".options.size = lib.mkDefault 300;
-              # "/tmp".options.size = lib.mkDefault 1000;
-            };
-          };
         };
       };
 
@@ -1089,7 +920,7 @@
               description = ''
                 Simply run the task without any container
               '';
-              default = pkgs.writeShellApplication {
+              default = writers.shell {
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
                 text = ''
@@ -1103,24 +934,8 @@
       };
     };
 
-    config = let
-      preset = presets.${config.preset} {inherit config;};
-    in {
-      after = lib.mkIf (preset ? after) (lib.mkDefault preset.after);
-      command = lib.mkIf (preset ? command) (lib.mkDefault preset.command);
-      dependencies =
-        if (preset ? dependencies)
-        then preset.dependencies
-        else [];
-      env =
-        if (preset ? env)
-        then lib.mapAttrs (key: value: lib.mkDefault value) preset.env
-        else {};
-      memory = lib.mkIf (preset ? memory) (lib.mkDefault preset.memory);
-      run = lib.mkIf (preset ? run) (lib.mkDefault preset.run);
-      runtime = lib.mkIf (preset ? runtime) (lib.mkDefault preset.runtime);
-      tag = lib.mkIf (preset ? tag) (lib.mkDefault preset.tag);
-      workingDir = lib.mkIf (preset ? workingDir) (lib.mkDefault preset.workingDir);
+    config = {
+      commands = lib.mkDefault [task.command];
     };
   });
 
@@ -1263,11 +1078,13 @@ in {
     };
   };
 
-  config = {
-    dag = lib.mapAttrs (name: task: task.after) config.task;
+  config = let
+    enabledTasks = lib.filterAttrs (name: task: task.enable != null && task.enable != false) config.task;
+  in {
+    dag = lib.mapAttrs (name: task: task.after) enabledTasks;
 
     wrappedTask = let
-      bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") config.task;
+      bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
 
       spec = lib.escapeShellArg (builtins.toJSON {
         inherit (config) dag;
@@ -1287,6 +1104,6 @@ in {
           };
         }
       )
-      config.task;
+      enabledTasks;
   };
 }

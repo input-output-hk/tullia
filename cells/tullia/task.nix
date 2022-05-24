@@ -6,26 +6,21 @@
   inherit (cell.library) dependencies;
 in {
   tidy = {
-    command = {
-      type = "bash";
-      text = ''
-        go mod tidy -v
-      '';
-    };
+    command.text = ''
+      go mod tidy -v
+    '';
     inherit dependencies;
   };
 
   lint = {config ? {}, ...}: {
-    command = {
-      type = "bash";
-      text = ''
-        echo linting go...
-        golangci-lint run
+    command.text = ''
+      echo linting go...
+      golangci-lint run
 
-        echo linting nix...
-        fd -e nix -X alejandra -c
-      '';
-    };
+      echo linting nix...
+      fd -e nix -X alejandra -c
+    '';
+    command.check = false;
     inherit dependencies;
     env.SHA = config.action.facts.push.value.sha or "no sha";
   };
@@ -34,47 +29,71 @@ in {
     command = {
       type = "ruby";
       text = ''
+        pp HOME: ENV["HOME"]
+        pp BAR: ENV["BAR"]
         puts "Hello World!"
       '';
     };
+
+    preset.nix.enable = true;
   };
 
   goodbye = {
     command = {
       type = "elvish";
       text = ''
+        echo HOME: $E:HOME
+        echo BAR: $E:BAR
         echo "goodbye"
       '';
     };
+    after = ["git-clone"];
   };
 
   bump = {
-    command = {
-      type = "ruby";
-      text = ./bump.rb;
-    };
+    command.type = "ruby";
+    command.text = ./bump.rb;
     after = ["tidy"];
     inherit dependencies;
   };
 
   build = {
-    command = "go build -o tullia ./cli";
+    command.text = "go build -o tullia ./cli";
     after = ["lint"];
     inherit dependencies;
   };
 
-  nix-build = {
-    command = "nix build";
-    after.successOf = ["lint" "bump"];
-    after.failureOf = ["lint" "bump"];
+  nix-build = {config ? {}, ...}: {
+    command.text = "nix build";
+
     inherit dependencies;
     memory = 2 * 1024;
+
+    preset.nix.enable = true;
+    preset.github-ci = {
+      enable = true;
+      repo = "input-output-hk/tullia";
+      inherit (config.facts.push.value) sha;
+    };
   };
 
-  github-status-failure = {
-    command = "tullia github fail";
-    after.failureOf = ["lint" "bump" "nix-build"];
-    inherit dependencies;
-    memory = 2 * 1024;
-  };
+  # github-status-pending = {
+  #   command = "github status building";
+  #   before = ["*"];
+  # };
+
+  # github-status-failure = {
+  #   command = "github status failed";
+  #   afterFailureOf = ["*"];
+  # };
+
+  # github-status-success = {
+  #   command = "github status ok";
+  #   afterSuccessOf = ["*"];
+  # };
+
+  # github-status-success = {
+  #   command = "github status failed";
+  #   onSuccessOf = ["lint" "bump" "nix-build"];
+  # };
 }
