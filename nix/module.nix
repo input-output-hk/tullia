@@ -297,7 +297,7 @@
               type = package;
               default = writers.shell {
                 inherit (task) name;
-                text = computeCommand task;
+                text = "${computeCommand task}/bin/${task.name}";
               };
             };
 
