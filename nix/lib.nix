@@ -23,7 +23,7 @@ inputs: let
       storePaths = splitString "\n" content;
     };
   in
-    pkgs // {inherit buildImage getClosure;});
+    pkgs // {inherit tullia buildImage getClosure;});
 
   evalAction = {
     tasks,

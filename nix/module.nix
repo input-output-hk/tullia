@@ -243,7 +243,7 @@
       };
 
       memory = mkOption {
-        type = ints.positive;
+        type = ints.unsigned;
         default = 300;
       };
 
@@ -1063,8 +1063,8 @@ in {
         n: v: {
           name = n;
           value = {
-            dependencies = with pkgs; [tullia];
-            command = ''
+            dependencies = [pkgs.tullia];
+            command.text = ''
               exec tullia run ${n} --run-spec ${spec} --mode passthrough --runtime unwrapped
             '';
             nsjail.setsid = true;
