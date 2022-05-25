@@ -5,10 +5,13 @@
   pkgs = inputs.nixpkgs;
   inherit (cell.library) dependencies;
 in {
+  ci = {
+    command.text = "echo CI passed";
+    after = ["build" "nix-build"];
+  };
+
   tidy = {
-    command.text = ''
-      go mod tidy -v
-    '';
+    command.text = "go mod tidy -v";
     inherit dependencies;
   };
 
@@ -25,39 +28,26 @@ in {
   };
 
   hello = {
-    command = {
-      type = "ruby";
-      text = ''
-        pp HOME: ENV["HOME"]
-        pp BAR: ENV["BAR"]
-        puts "Hello World!"
-      '';
-    };
-
-    preset.nix.enable = true;
+    command.type = "ruby";
+    command.text = "puts 'Hello World!'";
   };
 
   goodbye = {
-    command = {
-      type = "elvish";
-      text = ''
-        echo HOME: $E:HOME
-        echo BAR: $E:BAR
-        echo "goodbye"
-      '';
-    };
+    command.type = "elvish";
+    command.text = "echo goodbye";
   };
 
   bump = {
     command.type = "ruby";
     command.text = ./bump.rb;
-    after = ["tidy"];
+    after = ["tidy" "lint"];
     inherit dependencies;
+    preset.nix.enable = true;
   };
 
   build = {
     command.text = "go build -o tullia ./cli";
-    after = ["lint"];
+    after = ["bump"];
     inherit dependencies;
   };
 
@@ -74,24 +64,4 @@ in {
       sha = config.facts.push.value.sha or null;
     };
   };
-
-  # github-status-pending = {
-  #   command = "github status building";
-  #   before = ["*"];
-  # };
-
-  # github-status-failure = {
-  #   command = "github status failed";
-  #   afterFailureOf = ["*"];
-  # };
-
-  # github-status-success = {
-  #   command = "github status ok";
-  #   afterSuccessOf = ["*"];
-  # };
-
-  # github-status-success = {
-  #   command = "github status failed";
-  #   onSuccessOf = ["lint" "bump" "nix-build"];
-  # };
 }

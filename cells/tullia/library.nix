@@ -82,6 +82,8 @@
   ];
   # evaluated = evalTasks tasks;
 in {
+  pp2 = a: b: __trace (__toJSON a) b;
+  pp = a: __trace (__toJSON a) a;
+
   inherit evalTasks evalActions dependencies;
-  # inherit (evaluated) task dag;
 }

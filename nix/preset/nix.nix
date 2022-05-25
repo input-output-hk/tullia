@@ -8,7 +8,6 @@
 
   config = lib.mkIf config.preset.nix.enable {
     nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
-    nsjail.env.USER = lib.mkDefault "nixbld1";
     nsjail.bindmount.ro = let
       inherit (config.closure) closure;
     in
@@ -41,6 +40,7 @@
         "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
       };
     in {
+      USER = lib.mkDefault "nixbld1";
       # TODO: real options for this?
       NIX_CONFIG = lib.mkDefault ''
         experimental-features = ca-derivations flakes nix-command

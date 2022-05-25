@@ -8,7 +8,7 @@
   runtimeInputs ? [],
   check ? true,
 }:
-pkgs.writeTextFile {
+writeTextFile {
   inherit name;
   executable = true;
   destination = "/bin/${name}";
