@@ -893,7 +893,7 @@
                 runtimeInputs = task.dependencies;
                 text = ''
                   ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                  ${computeCommand task}
+                  ${computeCommand task}/bin/${task.name}
                 '';
               };
             };
