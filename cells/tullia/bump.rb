@@ -6,11 +6,28 @@ require 'date'
 require 'open3'
 require 'English'
 
-pkg = '.#defaultPackage.x86_64-linux'
-attrs = `nix eval --json "#{pkg}" --apply 'p: { inherit (p) vendorSha256 version; }' --extra-experimental-features "nix-command flakes"`
-raise "couldn't get package info" unless $CHILD_STATUS.success?
+pp Dir['/usr/bin/*']
 
-old_sha, version = JSON.parse(attrs).values_at('vendorSha256', 'version')
+pkg = 'path:.#defaultPackage.x86_64-linux'
+old_sha, version = []
+
+Open3.popen3(
+  'nix', 'eval', '--json', pkg,
+  '--extra-experimental-features', 'nix-command flakes',
+  '--apply', 'p: { inherit (p) vendorSha256 version; }'
+) do |_si, so, se|
+  se.each_line do |line|
+    puts line
+  end
+
+  so.each_line do |line|
+    puts line
+    old_sha, version = JSON.parse(line).values_at('vendorSha256', 'version')
+  end
+end
+
+# Open3 doesn't set $? when things go smooth
+raise "couldn't get package data" if $CHILD_STATUS && !$CHILD_STATUS.success?
 
 needle = /#{Regexp.escape(old_sha)}/
 file = Dir.glob('**/*.nix').find { |path| File.open(path) { |fd| fd.grep(needle).any? } }
@@ -38,15 +55,16 @@ Open3.popen3(
   'build', "#{pkg}.invalidHash"
 ) do |_si, so, se|
   so.each_line do |line|
-    pp so: line
+    puts line
   end
+
   se.each_line do |line|
-    pp se: line
+    puts line
     new_sha = $LAST_MATCH_INFO[:sha] if line =~ /^\s+got:\s+(?<sha>sha256-\S+)$/
   end
 end
 
-raise "couldn't build package" unless $CHILD_STATUS.success?
+raise "couldn't build package" if $CHILD_STATUS && !$CHILD_STATUS.success?
 
 if old_sha == new_sha
   puts 'Skipping vendorSha256 update'

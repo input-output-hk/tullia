@@ -3,7 +3,7 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
-    nix2container.url = "github:nlewo/nix2container";
+    nix2container.url = "github:nlewo/nix2container/init-nix-db";
     std.url = "github:divnix/std";
   };
 

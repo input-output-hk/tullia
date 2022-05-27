@@ -8,29 +8,41 @@
 
   config = lib.mkIf config.preset.nix.enable {
     nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
-    nsjail.bindmount.ro = let
-      inherit (config.closure) closure;
-    in
-      lib.mkDefault ["${closure}/registration:/registration"];
+    nsjail.bindmount.ro = lib.mkDefault ["${config.closure.closure}/registration:/registration"];
+    oci.contents = lib.mkDefault [
+      (
+        pkgs.symlinkJoin {
+          name = "etc";
+          paths = let
+            etc = pkgs.runCommand "etc" {} ''
+              mkdir -p $out/etc
+              echo "nixbld:x:1000:nixbld1" > "$out/etc/group"
+              echo "nixbld1:x:1000:$gid:nixbld1:/local:/bin/sh" > "$out/etc/passwd"
+              echo "nixbld1:1000:100" > "$out/etc/subgid"
+              echo "nixbld1:1000:100" > "$out/etc/subuid"
+            '';
+          in [etc];
+        }
+      )
+    ];
 
     dependencies = with pkgs;
       lib.mkDefault [
-        bashInteractive
-        cacert
-        coreutils-full
-        curl
-        findutils
+        coreutils
         gitMinimal
-        gnugrep
-        gnutar
-        gzip
-        iana-etc
-        less
-        man
         nix
-        shadow
-        wget
-        which
+        # bashInteractive
+        # cacert
+        # curl
+        # findutils
+        # gnugrep
+        # gnutar
+        # gzip
+        # iana-etc
+        # less
+        # shadow
+        # wget
+        # which
       ];
 
     env = let
@@ -55,9 +67,11 @@
     commands = lib.mkDefault (lib.mkBefore [
       {
         type = "shell";
+        runtimeInputs = [pkgs.nix];
         text = ''
           if [[ -s /registration ]]; then
             if command -v nix-store >/dev/null; then
+              echo populating nix store...
               nix-store --load-db < /registration
             fi
           fi

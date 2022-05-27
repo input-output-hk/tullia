@@ -287,6 +287,7 @@
               type = package;
               default = pkgs.buildImage {
                 inherit (task.oci) name tag maxLayers contents config;
+                initializeNixDatabase = true;
               };
             };
 

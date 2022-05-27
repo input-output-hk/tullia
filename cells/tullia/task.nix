@@ -4,59 +4,66 @@
 }: let
   pkgs = inputs.nixpkgs;
   inherit (cell.library) dependencies;
+
+  cmd = type: text: {
+    command = {inherit type text;};
+    inherit dependencies;
+  };
 in {
-  ci = {
-    command.text = "echo CI passed";
-    after = ["build" "nix-build"];
-  };
+  hello = cmd "ruby" "puts 'Hello World!'";
 
-  tidy = {
-    command.text = "go mod tidy -v";
-    inherit dependencies;
-  };
+  goodbye = cmd "elvish" "echo goodbye";
 
-  lint = {config ? {}, ...}: {
-    command.text = ''
-      echo linting go...
-      golangci-lint run
+  tidy = cmd "shell" "go mod tidy -v";
 
-      echo linting nix...
-      fd -e nix -X alejandra -c
-    '';
-    inherit dependencies;
-    # env.SHA = config.action.facts.push.value.sha or "no sha";
-  };
+  lint = cmd "shell" ''
+    echo linting go...
+    golangci-lint run
 
-  hello = {
-    command.type = "ruby";
-    command.text = "puts 'Hello World!'";
-  };
+    echo linting nix...
+    fd -e nix -X alejandra -c
+  '';
 
-  goodbye = {
-    command.type = "elvish";
-    command.text = "echo goodbye";
-  };
+  ci = {config ? {}, ...}:
+    cmd "shell" ''
+      echo Fact:
+      cat ${pkgs.writeText "fact.json" (builtins.toJSON (config.facts.push or ""))}
+      echo CI passed
+    ''
+    // {after = ["hello" "goodbye" "nix-preset" "build" "nix-build"];};
 
-  bump = {
-    command.type = "ruby";
-    command.text = ./bump.rb;
-    after = ["tidy" "lint"];
-    inherit dependencies;
-    preset.nix.enable = true;
-  };
+  bump =
+    cmd "ruby" ./bump.rb
+    // {
+      after = ["tidy" "lint"];
+      preset.nix.enable = true;
+    };
 
-  build = {
-    command.text = "go build -o tullia ./cli";
-    after = ["bump"];
-    inherit dependencies;
-  };
+  build =
+    cmd "shell" "go build -o tullia ./cli"
+    // {
+      after = ["bump"];
+      dependencies = with pkgs; [go];
+    };
+
+  nix-preset =
+    cmd "ruby" ''
+      { fetchTarball: 'https://github.com/input-output-hk/tullia/archive/main.tar.gz',
+        fetchurl: 'https://github.com/input-output-hk/tullia/archive/main.tar.gz',
+        fetchGit: '{ url = "https://github.com/input-output-hk/tullia"; ref = "main"; }',
+      }.each do |fun, url|
+        puts "try #{fun} #{url}"
+        system("nix", "eval", "--json", "--impure", "--expr", <<~NIX)
+          builtins.#{fun} #{url}
+        NIX
+        pp $?
+      end
+    ''
+    // {preset.nix.enable = true;};
 
   nix-build = {config ? {}, ...}: {
     command.text = "nix build";
-
-    inherit dependencies;
     memory = 2 * 1024;
-
     preset.nix.enable = true;
     preset.github-ci = {
       enable = config ? facts;

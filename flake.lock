@@ -58,15 +58,16 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1648247166,
-        "narHash": "sha256-zGbrJ5ddo+MvCHHuY2kGWi6N2676DkBjz3Qbu66LhHg=",
+        "lastModified": 1653427219,
+        "narHash": "sha256-q6MzrIZq1BBFxYN+UQjW60LpQJXV6RIIUmO8gKRyMqg=",
         "owner": "nlewo",
         "repo": "nix2container",
-        "rev": "065e5b108650ee4c2dc80fe1f4952eff50922e6c",
+        "rev": "11a0e14c2468720f42ca8dec3b82862abf96c837",
         "type": "github"
       },
       "original": {
         "owner": "nlewo",
+        "ref": "init-nix-db",
         "repo": "nix2container",
         "type": "github"
       }
