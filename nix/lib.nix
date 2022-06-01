@@ -1,29 +1,8 @@
 inputs: let
-  inherit (inputs.nixpkgs.lib) evalModules filterAttrs mapAttrs fileContents splitString;
+  inherit (inputs.nixpkgs.lib) evalModules filterAttrs;
+  inherit (builtins) mapAttrs;
 
-  augmentPkgs = system: (let
-    pkgs = inputs.nixpkgs.legacyPackages.${system};
-    tullia = inputs.self.defaultPackage.${system};
-    inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
-    getClosure = {
-      script,
-      env,
-    }: let
-      closure =
-        pkgs.closureInfo
-        {
-          rootPaths = {
-            inherit script;
-            env = pkgs.writeTextDir "nix-support/env" (builtins.toJSON env);
-          };
-        };
-      content = fileContents "${closure}/store-paths";
-    in {
-      inherit closure;
-      storePaths = splitString "\n" content;
-    };
-  in
-    pkgs // {inherit tullia buildImage getClosure;});
+  augmentPkgs = import ./augmentPkgs.nix inputs;
 
   evalAction = {
     tasks,
@@ -49,7 +28,7 @@ inputs: let
             }
             {
               task =
-                builtins.mapAttrs (n: v: {
+                mapAttrs (n: v: {
                   action = {
                     inherit name id;
                     facts = inputs;
@@ -83,9 +62,9 @@ inputs: let
     .config;
 in rec {
   ciceroFromStd = args:
-    builtins.mapAttrs (
+    mapAttrs (
       system: actions: (
-        builtins.mapAttrs (
+        mapAttrs (
           actionName: action: let
             inner =
               evalAction {tasks = args.tasks.${system};} system {${actionName} = action;};
@@ -98,7 +77,7 @@ in rec {
     args.actions;
 
   tulliaFromStd = {tasks, ...}:
-    builtins.mapAttrs (evalTask {inherit tasks;}) tasks;
+    mapAttrs (evalTask {inherit tasks;}) tasks;
 
   fromStd = args: {
     # nix run .#tullia.x86_64-linux.task.goodbye.run

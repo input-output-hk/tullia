@@ -1,0 +1,15 @@
+[book]
+authors = ["Michael Fellinger"]
+language = "en"
+multilingual = false
+src = "src"
+title = "Tullia"
+
+[preprocessor.nix-eval]
+command = "mdbook-nix-eval"
+renderer = ["html"]
+#eval_command = "nix-instantiate"
+eval_args = "--timeout 5"
+
+[output.html]
+default-theme = "ayu"

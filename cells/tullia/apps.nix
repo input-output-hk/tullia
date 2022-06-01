@@ -70,4 +70,26 @@ in {
       done
     '';
   };
+
+  mdbook-nix-eval = nixpkgs.rustPlatform.buildRustPackage rec {
+    pname = "mdbook-nix-eval";
+    version = "1.0.1";
+
+    src = nixpkgs.fetchFromGitHub {
+      owner = "jasonrm";
+      repo = "mdbook-nix-eval";
+      rev = "v${version}";
+      sha256 = "sha256-FtrNPiz/CM+wxpKlIi5dEihzjJq/OXcEs+gM7OVx/18=";
+    };
+
+    cargoSha256 = "sha256-NSloPyf04APRePSzj/K/ZlJdw/qMyhuY1HAnYhqcTNo=";
+
+    meta = with lib; {
+      description = "preprocessor designed to evaluate code blocks containing nix expressions.";
+      homepage = "https://github.com/jasonrm/mdbook-nix-eval";
+      maintainers = with maintainers; [manveru];
+      license = licenses.mpl20;
+      platforms = platforms.unix;
+    };
+  };
 }

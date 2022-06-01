@@ -9,11 +9,21 @@
 in {
   options.preset.${name} = with lib; {
     enable = mkEnableOption "${name} preset";
+
     repo = mkOption {
       type = types.str;
+      description = ''
+        Path of the respository (the part after `github.com/`).
+      '';
+      example = "input-output-hk/tullia";
     };
+
     sha = mkOption {
       type = types.str;
+      example = "841342ce5a67acd93a78e5b1a56e6bbe92db926f";
+      description = ''
+        The Revision (SHA) of the commit to clone and report status on.
+      '';
     };
   };
 
@@ -83,7 +93,8 @@ in {
             inherit runtimeInputs;
             text = ''
               ${statusSetup}
-              if [[ "$(< .tullia/status)" = 0 ]]; then
+              echo task: "$TULLIA_TASK"
+              if [[ "$(< /alloc/tullia-status)" = 0 ]]; then
                 report success
               else
                 report failure

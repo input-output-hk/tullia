@@ -50,18 +50,10 @@ to build, by invoking a compiler but retaining caches between runs.
     └── tidy
 
     ❯ tullia run build
-    [✔] tidy    1.168872751s
-
-    ❯ tullia run build
-    [✗] build   0.0s
-    [✗] bump    0.0s
-    [✗] lint    4.159866144s
-    linting go...
-    cli/main.go:112:20: Error return value of `config.List.start` is not checked (errcheck)
-    config.List.start()
-    ^
-    Failed to run /nix/store/3yipxmjk3knsnr0q1hs1mm1ppfxxnvlx-lint-nsjail/bin/lint-nsjail: exit status 1
-    [✔] tidy    1.491003105s
+    [✔] done   build       38.055659394s
+    [✔] done   bump        36.479661466s
+    [✔] done   lint        10.892518424s
+    [✔] done   tidy        5.069157358s
 
 ### Mode
 

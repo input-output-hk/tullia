@@ -7,22 +7,52 @@
 
   cmd = type: text: {
     command = {inherit type text;};
-    inherit dependencies;
   };
 in {
   hello = cmd "ruby" "puts 'Hello World!'";
 
   goodbye = cmd "elvish" "echo goodbye";
 
-  tidy = cmd "shell" "go mod tidy -v";
+  tidy =
+    cmd "shell" "go mod tidy -v"
+    // {dependencies = with pkgs; [go];};
 
-  lint = cmd "shell" ''
-    echo linting go...
-    golangci-lint run
+  fail = {config ? {}, ...}:
+    cmd "shell" "exit 10"
+    // {
+      commands = pkgs.lib.mkMerge [
+        (pkgs.lib.mkOrder 1600 [
+          {
+            text = ''
+              echo this should be 10:
+              cat "/alloc/tullia-status-$TULLIA_TASK"
+            '';
+          }
+        ])
+      ];
+    };
 
-    echo linting nix...
-    fd -e nix -X alejandra -c
-  '';
+  doc =
+    cmd "shell" ''
+      echo "$PATH" | tr : "\n"
+      nix eval --raw .#doc.fine | sponge doc/src/module.md
+      mdbook build ./doc
+    ''
+    // {
+      dependencies = with pkgs; [coreutils moreutils mdbook];
+      preset.nix.enable = true;
+      memory = 1000;
+    };
+
+  lint =
+    cmd "shell" ''
+      echo linting go...
+      golangci-lint run
+
+      echo linting nix...
+      fd -e nix -X alejandra -c
+    ''
+    // {dependencies = with pkgs; [golangci-lint go gcc fd alejandra];};
 
   ci = {config ? {}, ...}:
     cmd "shell" ''
@@ -30,7 +60,19 @@ in {
       cat ${pkgs.writeText "fact.json" (builtins.toJSON (config.facts.push or ""))}
       echo CI passed
     ''
-    // {after = ["hello" "goodbye" "nix-preset" "build" "nix-build"];};
+    // {
+      after = [
+        "build"
+        "bump"
+        "doc"
+        "goodbye"
+        "hello"
+        "lint"
+        "nix-build"
+        "nix-preset"
+        "tidy"
+      ];
+    };
 
   bump =
     cmd "ruby" ./bump.rb

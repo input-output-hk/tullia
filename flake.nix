@@ -2,13 +2,14 @@
   description = "Tullia - the hero Cicero deserves";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.05";
     nix2container.url = "github:nlewo/nix2container/init-nix-db";
     std.url = "github:divnix/std";
   };
 
   outputs = inputs: let
     tasks = import ./nix/std.nix inputs;
+    doc = import ./nix/doc.nix inputs;
     lib = import ./nix/lib.nix inputs;
   in
     inputs.std.growOn {
@@ -35,5 +36,5 @@
       tasks = inputs.std.harvest inputs.self ["tullia" "task"];
     })
     # top level tullia outputs
-    (lib // {inherit tasks;});
+    (lib // {inherit tasks doc;});
 }

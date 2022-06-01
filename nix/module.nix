@@ -46,9 +46,19 @@
         text = getText command.text;
       };
 
-    mapCommand = idx: command: "${makeCommand idx command}/bin/${name}";
+    mapCommand = idx: command:
+      if command.main
+      then ''
+        status=0
+        ${makeCommand idx command}/bin/${name} || status="$?"
+        echo "$status" > /alloc/tullia-status-${name}
+      ''
+      else "${makeCommand idx command}/bin/${name}";
 
-    commandsWrapped = lib.concatImapStringsSep "\n" mapCommand task.commands;
+    commandsWrapped = ''
+      ${lib.concatImapStringsSep "\n" mapCommand task.commands}
+      exit "$status"
+    '';
   in
     writers.shell {
       inherit name;
@@ -124,20 +134,41 @@
         type = mkOption {
           type = enum (lib.attrNames writers);
           default = "shell";
+          description = ''
+            Type of the command
+          '';
         };
 
         runtimeInputs = mkOption {
           type = listOf package;
           default = task.dependencies;
+          description = ''
+            Dependencies of the command (defaults to task.dependencies)
+          '';
         };
 
         check = mkOption {
           type = bool;
           default = true;
+          description = ''
+            Check syntax of the command
+          '';
         };
 
         text = mkOption {
           type = either str path;
+          description = ''
+            Type of the command
+          '';
+        };
+
+        main = mkOption {
+          type = bool;
+          default = false;
+          internal = true;
+          description = ''
+            The main task, if this fails all commands in this task will.
+          '';
         };
       };
     });
@@ -165,39 +196,73 @@
       ++ (lib.attrValues presets);
 
     options = {
-      enable = mkOption {
-        type = anything;
-        default = true;
-      };
+      enable = lib.mkEnableOption "the task" // {default = true;};
 
       after = mkOption {
         type = listOf str;
         default = [];
+        description = ''
+          Name of Tullia tasks to run after this one.
+        '';
       };
 
       action = mkOption {
         default = {};
+        description = ''
+          Information provided by Cicero while executing an action.
+        '';
         type = submodule {
           options = {
-            name = mkOption {type = str;};
+            name = mkOption {
+              type = str;
+              description = ''
+                Name of the Cicero action
+              '';
+            };
 
-            id = mkOption {type = str;};
+            id = mkOption {
+              type = str;
+              description = ''
+                ID of the Cicero run
+              '';
+            };
 
             facts = mkOption {
               default = {};
+              description = ''
+                Facts that matched the io.
+              '';
               type = attrsOf (submodule (
                 {name, ...}: {
                   options = {
                     name = mkOption {
                       type = str;
                       default = name;
+                      description = ''
+                        Name of the fact
+                      '';
                     };
 
-                    id = mkOption {type = str;};
+                    id = mkOption {
+                      type = str;
+                      description = ''
+                        ID of the fact
+                      '';
+                    };
 
-                    binary_hash = mkOption {type = str;};
+                    binary_hash = mkOption {
+                      type = str;
+                      description = ''
+                        Binary hash of the fact
+                      '';
+                    };
 
-                    value = mkOption {type = attrsOf anything;};
+                    value = mkOption {
+                      type = attrsOf anything;
+                      description = ''
+                        Value of the fact
+                      '';
+                    };
                   };
                 }
               ));
@@ -208,22 +273,30 @@
 
       command = mkOption {
         type = commandType task;
+        default = {text = "";};
+        description = ''
+          Command to execute
+        '';
       };
 
       commands = mkOption {
         type = listOf (commandType task);
-        default = [task.command];
+        description = ''
+          Combines the command with any others defined by presets.
+        '';
       };
 
       computedCommand = mkOption {
         type = package;
         readOnly = true;
+        internal = true;
         default = computeCommand task;
       };
 
       closure = mkOption {
         type = attrsOf (either (listOf package) package);
         readOnly = true;
+        internal = true;
         default = pkgs.getClosure {
           script = task.computedCommand;
           env = task.env;
@@ -233,6 +306,9 @@
       dependencies = mkOption {
         type = listOf package;
         default = [];
+        description = ''
+          Dependencies used by the command
+        '';
       };
 
       env = mkOption {
@@ -240,6 +316,9 @@
         default = {
           SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         };
+        description = ''
+          Some description of `env`
+        '';
       };
 
       memory = mkOption {
@@ -248,28 +327,37 @@
       };
 
       name = mkOption {
-        type = strMatching "^[[:alnum:]-]+$";
+        # type = strMatching "^[[:alnum:]-]+$";
+        type = str;
         default = name;
       };
 
       run = mkOption {
         type = package;
         default = task.${task.runtime}.run;
+        description = ''
+          Depending on the `runtime` option, this is a shortcut to `task.<name>.<runtime>.run`.
+        '';
       };
 
       runtime = mkOption {
         type = enum ["nsjail" "podman" "unwrapped"];
         default = "nsjail";
-      };
-
-      tag = mkOption {
-        type = nullOr str;
-        default = null;
+        description = ''
+          The runtime determines how tullia executes the task. This directly
+          maps to the attribute `task.<name>.<runtime>.run` that is able to be
+          executed using `nix run`.
+        '';
       };
 
       workingDir = mkOption {
         type = str;
         default = "/repo";
+        description = ''
+          The directory that the task will be executed in.
+          This defaults to /repo and the source is available there using a
+          bindmount when run locally, or cloned when remotely.
+        '';
       };
 
       oci = mkOption {
@@ -298,7 +386,7 @@
 
             tag = mkOption {
               type = nullOr str;
-              default = task.tag;
+              default = null;
             };
 
             layers = mkOption {
@@ -541,7 +629,7 @@
           };
 
           config = let
-            script = computeCommand task;
+            script = task.computedCommand;
             inherit (task.closure) closure;
           in {
             layers = lib.mkDefault [rootDir];
@@ -711,7 +799,7 @@
                       --group "$gid" \
                       ''${cgroupV2Mount:+--use_cgroupv2} \
                       ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${computeCommand task}/bin/${config.name}"}
+                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${config.name}"}
                   '';
                 };
             };
@@ -882,19 +970,23 @@
 
       unwrapped = mkOption {
         default = {};
+        description = ''
+          Run the task without any container, useful for nested executions of
+          Tullia.
+        '';
         type = submodule {
           options = {
             run = mkOption {
               type = package;
               description = ''
-                Simply run the task without any container
+                Run the task without any container.
               '';
               default = writers.shell {
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
                 text = ''
                   ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                  ${computeCommand task}/bin/${task.name}
+                  ${task.computedCommand}/bin/${task.name}
                 '';
               };
             };
@@ -904,7 +996,9 @@
     };
 
     config = {
-      commands = lib.mkDefault [task.command];
+      commands = lib.mkOrder 500 [
+        (task.command // {main = true;})
+      ];
     };
   });
 
@@ -913,30 +1007,44 @@
       namespace = mkOption {
         type = str;
         default = "default";
+        description = ''
+          Namespace the Nomad job should run in.
+        '';
       };
 
       datacenters = mkOption {
         type = listOf str;
         default = ["dc1"];
+        description = ''
+          Which datacenters the Nomad job should be scheduled in.
+        '';
       };
 
       type = mkOption {
         type = enum ["batch" "service" "batch" "sysbatch"];
         default = "batch";
+        description = ''
+          The Nomad job type
+        '';
       };
 
       group = mkOption {
         default = {};
+        description = ''
+          The Nomad Task Group
+        '';
         type = attrsOf (submodule ({...}: {
           options = {
             reschedule = mkOption {
               type = attrsOf anything;
               default = {};
+              description = "Nomad reschedule stanza";
             };
 
             restart = mkOption {
               type = attrsOf anything;
               default = {};
+              description = "Nomad restart stanza";
             };
 
             task = mkOption {
@@ -946,6 +1054,7 @@
               # type = attrsOf taskType;
               type = attrsOf anything;
               apply = lib.mapAttrs (name: value: (value.nomad or value));
+              description = "Nomad job stanza";
             };
           };
         }));
@@ -973,15 +1082,25 @@
           '';
         in
           lib.fileContents def;
+        description = ''
+          Path to a CUE file specifying the inputs/outputs of the Cicero action.
+        '';
       };
 
       job = mkOption {
         type = attrsOf jobType;
+        default = {};
+        description = ''
+          The Nomad job generated from the task.
+        '';
       };
 
       task = mkOption {
         type = nullOr str;
         default = null;
+        description = ''
+          Name of the Tullia task to execute
+        '';
       };
 
       prepare = mkOption {
@@ -1010,6 +1129,9 @@
           );
         in
           lib.filter lib.isAttrs mapped;
+        description = ''
+          Information required by Cicero to push images.
+        '';
       };
     };
 
@@ -1024,26 +1146,41 @@ in {
     action = mkOption {
       default = {};
       type = attrsOf actionType;
+      description = ''
+        A Cicero action
+      '';
     };
 
     job = mkOption {
       default = {};
       type = attrsOf jobType;
+      description = ''
+        A Nomad job
+      '';
     };
 
     task = mkOption {
       default = {};
       type = attrsOf taskType;
+      description = ''
+        A Tullia task
+      '';
     };
 
     wrappedTask = mkOption {
       default = {};
       type = attrsOf taskType;
+      description = ''
+        A Tullia task wrapped in the tullia process to also execute its dependencies.
+      '';
     };
 
     dag = mkOption {
       default = {};
       type = attrsOf anything;
+      description = ''
+        Information for the Tullia execution
+      '';
     };
   };
 
@@ -1066,8 +1203,16 @@ in {
           value = {
             dependencies = [pkgs.tullia];
             command.text = ''
-              exec tullia run ${n} --run-spec ${spec} --mode passthrough --runtime unwrapped
+              exec tullia run ${n}
             '';
+            env = {
+              RUN_SPEC = builtins.toJSON {
+                inherit (config) dag;
+                inherit bin;
+              };
+              MODE = "passthrough";
+              RUNTIME = "unwrapped";
+            };
             nsjail.setsid = true;
             oci.maxLayers = 30;
           };

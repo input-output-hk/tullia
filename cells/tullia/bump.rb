@@ -6,8 +6,6 @@ require 'date'
 require 'open3'
 require 'English'
 
-pp Dir['/usr/bin/*']
-
 pkg = 'path:.#defaultPackage.x86_64-linux'
 old_sha, version = []
 

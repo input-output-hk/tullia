@@ -32,7 +32,7 @@ func (r RunSpec) MarshalZerologObject(event *zerolog.Event) {
 }
 
 type Config struct {
-	LogLevel string `arg:"--log-level" default:"info" help:"one of trace,debug,info,warn,error,fatal,panic"`
+	LogLevel string `arg:"--log-level,env:LOG_LEVEL" default:"info" help:"one of trace,debug,info,warn,error,fatal,panic"`
 	Run      *Run   `arg:"subcommand:run" help:"execute the given task"`
 	List     *List  `arg:"subcommand:list" help:"show a list of available tasks"`
 	log      zerolog.Logger
@@ -40,11 +40,11 @@ type Config struct {
 
 type Run struct {
 	Task      string `arg:"positional"`
-	DagFlake  string `arg:"--dag-flake" default:".#tullia.x86_64-linux.dag"`
-	Mode      string `arg:"--mode" default:"cli"`
-	Runtime   string `arg:"--runtime" default:"nsjail"`
-	TaskFlake string `arg:"--task-flake" default:".#tullia.x86_64-linux.task"`
-	RunSpec   string `arg:"--run-spec" help:"used internally"`
+	DagFlake  string `arg:"--dag-flake,env:DAG_FLAKE" default:".#tullia.x86_64-linux.dag"`
+	Mode      string `arg:"--mode,env:MODE" default:"cli"`
+	Runtime   string `arg:"--runtime,env:RUNTIME" default:"nsjail"`
+	TaskFlake string `arg:"--task-flake,env:TASK_FLAKE" default:".#tullia.x86_64-linux.task"`
+	RunSpec   string `arg:"--run-spec,env:RUN_SPEC" help:"used internally"`
 	runSpec   *RunSpec
 }
 

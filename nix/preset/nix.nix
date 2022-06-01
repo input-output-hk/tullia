@@ -7,9 +7,9 @@
   options.preset.nix.enable = lib.mkEnableOption "nix preset";
 
   config = lib.mkIf config.preset.nix.enable {
-    nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
-    nsjail.bindmount.ro = lib.mkDefault ["${config.closure.closure}/registration:/registration"];
-    oci.contents = lib.mkDefault [
+    nsjail.mount."/tmp".options.size = 1024;
+    nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
+    oci.contents = lib.mkBefore [
       (
         pkgs.symlinkJoin {
           name = "etc";
@@ -26,24 +26,7 @@
       )
     ];
 
-    dependencies = with pkgs;
-      lib.mkDefault [
-        coreutils
-        gitMinimal
-        nix
-        # bashInteractive
-        # cacert
-        # curl
-        # findutils
-        # gnugrep
-        # gnutar
-        # gzip
-        # iana-etc
-        # less
-        # shadow
-        # wget
-        # which
-      ];
+    dependencies = with pkgs; [coreutils gitMinimal nix];
 
     env = let
       substituters = {
@@ -64,7 +47,7 @@
       '';
     };
 
-    commands = lib.mkDefault (lib.mkBefore [
+    commands = lib.mkOrder 300 [
       {
         type = "shell";
         runtimeInputs = [pkgs.nix];
@@ -77,6 +60,6 @@
           fi
         '';
       }
-    ]);
+    ];
   };
 }
