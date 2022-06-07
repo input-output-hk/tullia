@@ -9,6 +9,72 @@
     command = {inherit type text;};
   };
 in {
+  matomo = let
+    cfgFile = pkgs.writeText "phpfpm-matomo.conf" ''
+      [global]
+      daemonize = no
+      error_log = /dev/stderr
+      systemd_interval = 0
+
+      [matomo]
+      catch_workers_output = yes
+      group = matomo
+      listen = /alloc/matomo.sock
+      pm = dynamic
+      pm.max_children = 75
+      pm.max_requests = 500
+      pm.max_spare_servers = 20
+      pm.min_spare_servers = 5
+      pm.start_servers = 10
+      user = matomo
+      env[PIWIK_USER_PATH] = /var/lib/matomo
+    '';
+
+    iniFile =
+      pkgs.runCommand "php.ini" {
+        phpOptions = ''
+          error_log = 'stderr'
+          log_errors = on
+        '';
+        preferLocalBuild = true;
+        passAsFile = ["phpOptions"];
+      } ''
+        cat ${pkgs.php}/etc/php.ini $phpOptionsPath > $out
+      '';
+
+    caddyFile = pkgs.writeTextDir "Caddyfile" ''
+      {
+        auto_https off
+      }
+
+      :7777 {
+        root * ${pkgs.matomo}/share
+        php_fastcgi unix//alloc/matomo.sock
+        file_server
+
+        log {
+          level DEBUG
+          output stdout
+        }
+      }
+    '';
+  in
+    cmd "shell" ''
+      php-fpm -y ${cfgFile} -c ${iniFile} &
+      caddy run -config ${caddyFile}/Caddyfile &
+      wait
+    ''
+    // {
+      dependencies = with pkgs; [
+        strace
+        php
+        caddy
+        coreutils
+      ];
+      nsjail.timeLimit = 0;
+      memory = 0;
+    };
+
   hello = cmd "ruby" "puts 'Hello World!'";
 
   goodbye = cmd "elvish" "echo goodbye";
