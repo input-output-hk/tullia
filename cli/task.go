@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/signal"
 	"sync"
 	"syscall"
 	"time"
@@ -158,10 +159,23 @@ func (t *Task) preExecJSON() {
 }
 
 func (t *Task) exec(stage string, f func()) error {
+	t.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	err := t.cmd.Start()
 	if err == nil {
-		// TODO: Measure resources here in cli mode
-		err = t.cmd.Wait()
+		var pgid int
+		pgid, err = syscall.Getpgid(t.cmd.Process.Pid)
+
+		if err == nil {
+			c := make(chan os.Signal)
+			go func() {
+				<-c
+				_ = syscall.Kill(-pgid, 15)
+			}()
+			signal.Notify(c, os.Kill, os.Interrupt)
+
+			// TODO: Measure resources here in cli mode
+			err = t.cmd.Wait()
+		}
 	}
 
 	switch t.stage {
@@ -263,7 +277,6 @@ type nixBuildResultOutput struct {
 func (t *Task) run() error {
 	t.cmd = exec.Command(t.storePath)
 	t.preExec("run")
-	t.cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	return t.exec("done", func() {})
 }
 
