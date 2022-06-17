@@ -1071,14 +1071,15 @@
   in {
     options = {
       io = mkOption {
-        type = path;
+        type = either str path;
         apply = v: let
+          src = if __isPath v then v else pkgs.writeText "io.cue" v;
           def = pkgs.runCommand "def.cue" {nativeBuildInputs = [pkgs.cue];} ''
             cue def --simplify > $out \
               ${../lib/prelude.cue} \
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
-              ${v}
+              ${src}
           '';
         in
           lib.fileContents def;
