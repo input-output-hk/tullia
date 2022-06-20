@@ -1073,7 +1073,10 @@
       io = mkOption {
         type = either str path;
         apply = v: let
-          src = if __isPath v then v else pkgs.writeText "io.cue" v;
+          src =
+            if __isPath v
+            then v
+            else pkgs.writeText "io.cue" v;
           def = pkgs.runCommand "def.cue" {nativeBuildInputs = [pkgs.cue];} ''
             cue def --simplify > $out \
               ${../lib/prelude.cue} \

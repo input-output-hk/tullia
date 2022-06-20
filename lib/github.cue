@@ -1,7 +1,7 @@
 _lib: github: pull_request?: {
-	#input:   string | *"GitHub Pull Request"
-	#repo:    string
-	#target?: string
+	#input:          string | *"GitHub Pull Request"
+	#repo:           string
+	#target?:        string
 	#target_default: bool | *false
 }
 
