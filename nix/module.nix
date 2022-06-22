@@ -250,6 +250,13 @@
                       '';
                     };
 
+                    created_at = mkOption {
+                      type = str;
+                      description = ''
+                        Date and time the fact was created
+                      '';
+                    };
+
                     binary_hash = mkOption {
                       type = str;
                       description = ''
