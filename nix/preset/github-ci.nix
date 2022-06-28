@@ -47,10 +47,11 @@ in {
           state: $state,
           context: $action_name,
           description: $description,
-          target_url: "\(env.CICERO_WEB_URL)/action/\($action_id)",
+          target_url: "\(env.CICERO_WEB_URL)/run/\($run_id)",
         }' \
           --arg state "$1" \
-          --arg description "Run $NOMAD_JOB_ID" \
+          --arg description "$(date --rfc-3339=seconds)" \
+          --arg run_id "$NOMAD_JOB_ID" \
           --arg action_id ${lib.escapeShellArg (config.action.id or "")} \
           --arg action_name ${lib.escapeShellArg (config.action.name or "")} \
         | curl https://github.com/${lib.escapeShellArg cfg.repo} \
