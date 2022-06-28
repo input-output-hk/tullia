@@ -107,6 +107,7 @@
 
         template = mkOption {
           default = [];
+          apply = lib.unique;
           type = listOf (submodule {
             options = let
               duration = strMatching "([[:digit:]]+(y|w|d|h|m|s|ms)){0,7}";
