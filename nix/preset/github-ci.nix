@@ -103,5 +103,7 @@ in {
           }
         ])
       ];
+
+      nomad.template."/secrets/cicero/github/token".data = ''{{with secret "kv/data/cicero/github"}}{{.Data.data.token}}{{end}}'';
     };
 }
