@@ -72,8 +72,8 @@ in {
               ${statusSetup}
               report pending
 
-              if [[ ! -d /repo ]]; then
-                git clone https://github.com/${lib.escapeShellArg cfg.repo}
+              if [[ -z "$(ls -1Aq)" ]]; then
+                git clone https://github.com/${lib.escapeShellArg cfg.repo} .
                 git checkout ${lib.escapeShellArg cfg.sha}
               fi
             '';
