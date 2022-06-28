@@ -87,7 +87,10 @@ in {
             inherit runtimeInputs;
             text = ''
               ${statusSetup}
-              if [[ "$(< /alloc/tullia-status)" = 0 ]]; then
+              if [[ ! -a /alloc/tullia-status ]]; then
+                echo >&2 'error: /alloc/tullia-status is missing'
+                report error
+              elif [[ "$(< /alloc/tullia-status)" = 0 ]]; then
                 report success
               else
                 report failure
