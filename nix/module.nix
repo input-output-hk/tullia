@@ -159,14 +159,6 @@
                 type = nullOr duration;
                 default = null;
               };
-
-              wait = rec {
-                max = min;
-                min = mkOption {
-                  type = nullOr duration;
-                  default = null;
-                };
-              };
             };
           });
         };
