@@ -109,7 +109,7 @@
           default = [];
           type = listOf (submodule {
             options = let
-              duration = strMatching "([[:digit:]]+(h|m|s|ms)){,4}";
+              duration = strMatching "([[:digit:]]+(y|w|d|h|m|s|ms)){0,7}";
             in {
               destination = mkOption {
                 type = str;
@@ -156,8 +156,8 @@
               };
 
               splay = mkOption {
-                type = nullOr duration;
-                default = null;
+                type = duration;
+                default = "5s";
               };
             };
           });
