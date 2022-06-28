@@ -106,15 +106,13 @@
         };
 
         template = mkOption {
-          default = {};
-          type = attrsOf (submodule ({name, ...}: {
+          default = [];
+          type = listOf (submodule {
             options = let
               duration = strMatching "([[:digit:]]+(h|m|s|ms)){,4}";
             in {
               destination = mkOption {
                 type = str;
-                default = name;
-                readOnly = true;
               };
 
               data = mkOption {
@@ -170,7 +168,7 @@
                 };
               };
             };
-          }));
+          });
         };
 
         meta = mkOption {
@@ -1279,22 +1277,9 @@ in {
         name: task: {
           inherit name;
           value = lib.mkMerge [
-            (lib.pipe task [
-              # remove all readOnly options to make eval succeed
-              (task: builtins.removeAttrs task ["closure" "computedCommand" "command"])
-              (task:
-                task
-                // {
-                  nomad =
-                    task.nomad
-                    // {
-                      template =
-                        builtins.mapAttrs
-                        (k: task: builtins.removeAttrs task ["destination"])
-                        task.nomad.template;
-                    };
-                })
-            ])
+            # remove all readOnly options to make eval succeed
+            (builtins.removeAttrs task ["closure" "computedCommand" "command"])
+
             {
               dependencies = [pkgs.tullia];
               command.text = ''
