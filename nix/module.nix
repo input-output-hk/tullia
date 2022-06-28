@@ -1271,24 +1271,36 @@ in {
       });
     in
       lib.mapAttrs' (
-        n: v: {
-          name = n;
-          value = {
-            dependencies = [pkgs.tullia];
-            command.text = ''
-              exec tullia run ${n}
-            '';
-            env = {
-              RUN_SPEC = builtins.toJSON {
-                inherit (config) dag;
-                inherit bin;
+        name: task: {
+          inherit name;
+          value = lib.mkMerge [
+            (lib.pipe task [ # remove all readOnly options to make eval succeed
+              (task: builtins.removeAttrs task ["closure" "computedCommand" "command"])
+              (task: task // {
+                nomad = task.nomad // {
+                  template = builtins.mapAttrs
+                    (k: task: builtins.removeAttrs task ["destination"])
+                    task.nomad.template;
+                };
+              })
+            ])
+            {
+              dependencies = [pkgs.tullia];
+              command.text = ''
+                exec tullia run ${lib.escapeShellArg name}
+              '';
+              env = {
+                RUN_SPEC = builtins.toJSON {
+                  inherit (config) dag;
+                  inherit bin;
+                };
+                MODE = "passthrough";
+                RUNTIME = "unwrapped";
               };
-              MODE = "passthrough";
-              RUNTIME = "unwrapped";
-            };
-            nsjail.setsid = true;
-            oci.maxLayers = 30;
-          };
+              nsjail.setsid = true;
+              oci.maxLayers = 30;
+            }
+          ];
         }
       )
       enabledTasks;
