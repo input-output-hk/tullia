@@ -54,7 +54,7 @@ in {
           --arg run_id "$NOMAD_JOB_ID" \
           --arg action_id ${lib.escapeShellArg (config.action.id or "")} \
           --arg action_name ${lib.escapeShellArg (config.action.name or "")} \
-        | curl https://github.com/${lib.escapeShellArg cfg.repo} \
+        | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
           --output /dev/null --fail-with-body \
           --no-progress-meter \
           -H 'Accept: application/vnd.github.v3+json' \
@@ -67,7 +67,7 @@ in {
       }
       trap err ERR
     '';
-    runtimeInputs = with pkgs; [jq curl gitMinimal];
+    runtimeInputs = with pkgs; [coreutils jq curl gitMinimal];
   in
     lib.mkIf cfg.enable {
       # lib.mkBefore is 500, so this will always run before
