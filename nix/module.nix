@@ -65,134 +65,135 @@
       text = commandsWrapped;
     };
 
-  taskNomadType = task: submodule {
-    options = {
-      driver = mkOption {
-        type = enum ["exec" "nix" "docker" "podman" "java"];
-        default = "podman";
-      };
-
-      config = mkOption {
-        type = attrsOf anything;
-        default = {};
-      };
-
-      env = mkOption {
-        type = attrsOf str;
-        default = {};
-      };
-
-      resources = mkOption {
-        default = {};
-        type = submodule {
-          options = {
-            cpu = mkOption {
-              type = ints.positive;
-              default = 100;
-            };
-
-            memory = mkOption {
-              type = ints.positive;
-              default = task.memory;
-            };
-
-            cores = mkOption {
-              type = nullOr ints.positive;
-              default = null;
-            };
-          };
+  taskNomadType = task:
+    submodule {
+      options = {
+        driver = mkOption {
+          type = enum ["exec" "nix" "docker" "podman" "java"];
+          default = "podman";
         };
-      };
 
-      template = mkOption {
-        default = {};
-        type = attrsOf (submodule ({ name, ... }: {
-          options = let
-            duration = strMatching "([[:digit:]]+(h|m|s|ms)){,4}";
-          in {
-            destination = mkOption {
-              type = str;
-              default = name;
-              readOnly = true;
-            };
+        config = mkOption {
+          type = attrsOf anything;
+          default = {};
+        };
 
-            data = mkOption {
-              type = lines;
-              default = "";
-            };
+        env = mkOption {
+          type = attrsOf str;
+          default = {};
+        };
 
-            change_mode = mkOption {
-              default = "restart";
-              type = enum ["noop" "restart" "signal"];
-            };
+        resources = mkOption {
+          default = {};
+          type = submodule {
+            options = {
+              cpu = mkOption {
+                type = ints.positive;
+                default = 100;
+              };
 
-            change_signal = mkOption {
-              default = "";
-              type = str;
-            };
+              memory = mkOption {
+                type = ints.positive;
+                default = task.memory;
+              };
 
-            perms = mkOption {
-              type = strMatching "[[:digit:]]{3,4}";
-              default = "644";
-            };
-
-            env = mkOption {
-              type = bool;
-              default = false;
-            };
-
-            left_delimiter = mkOption {
-              type = str;
-              default = "{{";
-            };
-
-            right_delimiter = mkOption {
-              type = str;
-              default = "}}";
-            };
-
-            source = mkOption {
-              type = str;
-              default = "";
-            };
-
-            splay = mkOption {
-              type = nullOr duration;
-              default = null;
-            };
-
-            wait = rec {
-              max = min;
-              min = mkOption {
-                type = nullOr duration;
+              cores = mkOption {
+                type = nullOr ints.positive;
                 default = null;
               };
             };
           };
-        }));
+        };
+
+        template = mkOption {
+          default = {};
+          type = attrsOf (submodule ({name, ...}: {
+            options = let
+              duration = strMatching "([[:digit:]]+(h|m|s|ms)){,4}";
+            in {
+              destination = mkOption {
+                type = str;
+                default = name;
+                readOnly = true;
+              };
+
+              data = mkOption {
+                type = lines;
+                default = "";
+              };
+
+              change_mode = mkOption {
+                default = "restart";
+                type = enum ["noop" "restart" "signal"];
+              };
+
+              change_signal = mkOption {
+                default = "";
+                type = str;
+              };
+
+              perms = mkOption {
+                type = strMatching "[[:digit:]]{3,4}";
+                default = "644";
+              };
+
+              env = mkOption {
+                type = bool;
+                default = false;
+              };
+
+              left_delimiter = mkOption {
+                type = str;
+                default = "{{";
+              };
+
+              right_delimiter = mkOption {
+                type = str;
+                default = "}}";
+              };
+
+              source = mkOption {
+                type = str;
+                default = "";
+              };
+
+              splay = mkOption {
+                type = nullOr duration;
+                default = null;
+              };
+
+              wait = rec {
+                max = min;
+                min = mkOption {
+                  type = nullOr duration;
+                  default = null;
+                };
+              };
+            };
+          }));
+        };
+
+        meta = mkOption {
+          type = attrsOf str;
+          default = {};
+        };
+
+        service = mkOption {
+          type = attrsOf anything;
+          default = {};
+        };
       };
 
-      meta = mkOption {
-        type = attrsOf str;
-        default = {};
-      };
+      config = {
+        # NOTE: there has to be a better way to get the original value before `apply` ran?
+        env = task.oci.env;
 
-      service = mkOption {
-        type = attrsOf anything;
-        default = {};
+        config =
+          if task.nomad.driver == "podman"
+          then {image = lib.mkDefault (task.oci.image // {__toString = _: getImageName task.oci.image;});}
+          else throw "Driver '${task.nomad.driver}' not supported yet";
       };
     };
-
-    config = {
-      # NOTE: there has to be a better way to get the original value before `apply` ran?
-      env = task.oci.env;
-
-      config =
-        if task.nomad.driver == "podman"
-        then {image = lib.mkDefault (task.oci.image // {__toString = _: getImageName task.oci.image;});}
-        else throw "Driver '${task.nomad.driver}' not supported yet";
-    };
-  };
 
   commandType = task:
     submodule {
@@ -1152,9 +1153,10 @@
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
               ${
-                if __isPath v then v else
-                  "- <<< ${lib.escapeShellArg v}"
-              } 
+              if __isPath v
+              then v
+              else "- <<< ${lib.escapeShellArg v}"
+            }
           '';
         in
           lib.fileContents def;
@@ -1277,15 +1279,21 @@ in {
         name: task: {
           inherit name;
           value = lib.mkMerge [
-            (lib.pipe task [ # remove all readOnly options to make eval succeed
+            (lib.pipe task [
+              # remove all readOnly options to make eval succeed
               (task: builtins.removeAttrs task ["closure" "computedCommand" "command"])
-              (task: task // {
-                nomad = task.nomad // {
-                  template = builtins.mapAttrs
-                    (k: task: builtins.removeAttrs task ["destination"])
-                    task.nomad.template;
-                };
-              })
+              (task:
+                task
+                // {
+                  nomad =
+                    task.nomad
+                    // {
+                      template =
+                        builtins.mapAttrs
+                        (k: task: builtins.removeAttrs task ["destination"])
+                        task.nomad.template;
+                    };
+                })
             ])
             {
               dependencies = [pkgs.tullia];
