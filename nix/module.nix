@@ -65,7 +65,7 @@
       text = commandsWrapped;
     };
 
-  taskNomadType = task: (submodule {
+  taskNomadType = task: submodule {
     options = {
       driver = mkOption {
         type = enum ["exec" "nix" "docker" "podman" "java"];
@@ -124,12 +124,10 @@
         then {image = lib.mkDefault (task.oci.image // {__toString = _: getImageName task.oci.image;});}
         else throw "Driver '${task.nomad.driver}' not supported yet";
     };
-  });
+  };
 
   commandType = task:
-    submodule ({config, ...}: let
-      command = config;
-    in {
+    submodule {
       options = {
         type = mkOption {
           type = enum (lib.attrNames writers);
@@ -171,7 +169,7 @@
           '';
         };
       };
-    });
+    };
 
   taskType = submodule ({
     name,
@@ -1009,7 +1007,7 @@
     };
   });
 
-  jobType = submodule ({name, ...}: {
+  jobType = submodule {
     options = {
       namespace = mkOption {
         type = str;
@@ -1040,7 +1038,7 @@
         description = ''
           The Nomad Task Group
         '';
-        type = attrsOf (submodule ({...}: {
+        type = attrsOf (submodule {
           options = {
             reschedule = mkOption {
               type = attrsOf anything;
@@ -1064,10 +1062,10 @@
               description = "Nomad job stanza";
             };
           };
-        }));
+        });
       };
     };
-  });
+  };
 
   actionType = submodule ({
     name,
@@ -1145,7 +1143,7 @@
     config = lib.mkIf (action.task != null) (let
       sname = sanitizeServiceName name;
     in {
-      job.${sname}.group.tullia.task.tullia = moduleConfig.wrappedTask."${action.task}";
+      job.${sname}.group.tullia.task.tullia = moduleConfig.wrappedTask.${action.task};
     });
   });
 in {
