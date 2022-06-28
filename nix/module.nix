@@ -7,7 +7,7 @@
   ...
 }: let
   inherit (lib) mkOption;
-  inherit (lib.types) attrsOf submodule attrs str listOf enum ints package nullOr bool oneOf either anything strMatching function path;
+  inherit (lib.types) attrsOf submodule attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path;
   inherit (builtins) concatStringsSep filter isString split toJSON typeOf;
 
   pp2 = a: b: __trace (__toJSON a) b;
@@ -102,6 +102,74 @@
             };
           };
         };
+      };
+
+      template = mkOption {
+        default = {};
+        type = attrsOf (submodule ({ name, ... }: {
+          options = let
+            duration = strMatching "([[:digit:]]+(h|m|s|ms)){,4}";
+          in {
+            destination = mkOption {
+              type = str;
+              default = name;
+              readOnly = true;
+            };
+
+            data = mkOption {
+              type = lines;
+              default = "";
+            };
+
+            change_mode = mkOption {
+              default = "restart";
+              type = enum ["noop" "restart" "signal"];
+            };
+
+            change_signal = mkOption {
+              default = "";
+              type = str;
+            };
+
+            perms = mkOption {
+              type = strMatching "[[:digit:]]{3,4}";
+              default = "644";
+            };
+
+            env = mkOption {
+              type = bool;
+              default = false;
+            };
+
+            left_delimiter = mkOption {
+              type = str;
+              default = "{{";
+            };
+
+            right_delimiter = mkOption {
+              type = str;
+              default = "}}";
+            };
+
+            source = mkOption {
+              type = str;
+              default = "";
+            };
+
+            splay = mkOption {
+              type = nullOr duration;
+              default = null;
+            };
+
+            wait = rec {
+              max = min;
+              min = mkOption {
+                type = nullOr duration;
+                default = null;
+              };
+            };
+          };
+        }));
       };
 
       meta = mkOption {
