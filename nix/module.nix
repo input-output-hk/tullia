@@ -273,6 +273,7 @@
           options = {
             name = mkOption {
               type = str;
+              default = "";
               description = ''
                 Name of the Cicero action
               '';
@@ -280,6 +281,7 @@
 
             id = mkOption {
               type = str;
+              default = "";
               description = ''
                 ID of the Cicero run
               '';
