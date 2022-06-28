@@ -103,14 +103,14 @@ in {
     ''
     // {preset.nix.enable = true;};
 
-  nix-build = {config ? {}, ...}: {
+  nix-build = {config, ...}: {
     command.text = "nix build";
     memory = 2 * 1024;
     preset.nix.enable = true;
     preset.github-ci = {
-      enable = config ? facts;
+      enable = config.action.facts or null != null;
       repo = "input-output-hk/tullia";
-      sha = config.facts.push.value.sha or null;
+      sha = config.action.facts.push.value.sha or "";
     };
   };
 }
