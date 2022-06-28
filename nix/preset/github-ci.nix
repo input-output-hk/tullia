@@ -29,19 +29,15 @@ in {
 
   config = let
     statusSetup = ''
-      function cleanup {
-        rm -f "$secret_headers"
-      }
-      trap cleanup EXIT
-
-      secret_headers="$(mktemp)"
+      trap 'rm -f "$secret_headers"' EXIT
+      secret_headers=$(mktemp)
 
       cat >> "$secret_headers" <<EOF
       Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)
       EOF
 
       function report {
-        echo 'Reporting GitHub commit status: '"$1"
+        echo >&2 'Reporting GitHub commit status: '"$1"
 
         jq -nc '{
           state: $state,
@@ -52,8 +48,7 @@ in {
           --arg state "$1" \
           --arg description "$(date --rfc-3339=seconds)" \
           --arg run_id "$NOMAD_JOB_ID" \
-          --arg action_id ${lib.escapeShellArg (config.action.id or "")} \
-          --arg action_name ${lib.escapeShellArg (config.action.name or "")} \
+          --arg action_name ${lib.escapeShellArg config.action.name or ""} \
         | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
           --output /dev/null --fail-with-body \
           --no-progress-meter \
@@ -62,16 +57,13 @@ in {
           --data-binary @-
       }
 
-      function err {
-        report error
-      }
-      trap err ERR
+      trap 'report error' ERR
     '';
     runtimeInputs = with pkgs; [coreutils jq curl gitMinimal];
   in
     lib.mkIf cfg.enable {
-      # lib.mkBefore is 500, so this will always run before
       commands = lib.mkMerge [
+        # lib.mkBefore is 500 so this will always run before
         (lib.mkOrder 400 [
           {
             type = "shell";
@@ -88,13 +80,13 @@ in {
           }
         ])
 
+        # lib.mkAfter is 1500 so this will always run after
         (lib.mkOrder 1600 [
           {
             type = "shell";
             inherit runtimeInputs;
             text = ''
               ${statusSetup}
-              echo task: "$TULLIA_TASK"
               if [[ "$(< /alloc/tullia-status)" = 0 ]]; then
                 report success
               else
