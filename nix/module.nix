@@ -1151,7 +1151,10 @@
               ${../lib/prelude.cue} \
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
-              ${lib.optionalString (!__isPath v) "- <<<"} ${lib.escapeShellArg v}
+              ${
+                if __isPath v then v else
+                  "- <<< ${lib.escapeShellArg v}"
+              } 
           '';
         in
           lib.fileContents def;
