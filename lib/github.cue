@@ -22,8 +22,6 @@ if cfg != _|_ {
 				repo: clone_url: string
 				sha: string
 			}
-
-			"_links": statuses: href: string
 		}
 
 		if cfg.#target_default {
