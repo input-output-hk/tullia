@@ -1,7 +1,7 @@
 inputs: system: (let
   pkgs = inputs.nixpkgs.legacyPackages.${system};
   tullia = inputs.self.defaultPackage.${system};
-  inherit (inputs.nix2container.packages.${system}.nix2container) buildImage;
+  inherit (inputs.nix2container.packages.${system}.nix2container) buildImage buildLayer;
   inherit (pkgs.lib) fileContents splitString;
   getClosure = {
     script,
@@ -21,4 +21,4 @@ inputs: system: (let
     storePaths = splitString "\n" content;
   };
 in
-  pkgs // {inherit tullia buildImage getClosure;})
+  pkgs // {inherit tullia buildImage buildLayer getClosure;})

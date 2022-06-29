@@ -15,6 +15,7 @@ inputs: let
       id,
       inputs,
       ociRegistry,
+      rootDir ? null,
     }:
       (evalModules
         {
@@ -61,23 +62,35 @@ inputs: let
     })
     .config;
 in rec {
-  ciceroFromStd = args:
+  ciceroFromStd = {
+    actions,
+    tasks,
+    rootDir ? null,
+    ...
+  }:
     mapAttrs (
-      system: actions: (
+      system: actions': (
         mapAttrs (
           actionName: action: let
-            inner =
-              evalAction {tasks = args.tasks.${system};} system {${actionName} = action;};
+            inner = evalAction {
+              tasks = tasks.${system};
+              inherit rootDir;
+            }
+            system {${actionName} = action;};
           in
             further: (inner ({name = actionName;} // further)).action.${actionName}
         )
-        actions
+        actions'
       )
     )
-    args.actions;
+    actions;
 
-  tulliaFromStd = {tasks, ...}:
-    mapAttrs (evalTask {inherit tasks;}) tasks;
+  tulliaFromStd = {
+    tasks,
+    rootDir ? null,
+    ...
+  }:
+    mapAttrs (evalTask {inherit tasks rootDir;}) tasks;
 
   fromStd = args: {
     # nix run .#tullia.x86_64-linux.task.goodbye.run

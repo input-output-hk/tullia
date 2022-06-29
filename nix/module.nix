@@ -441,7 +441,7 @@
             image = mkOption {
               type = package;
               default = pkgs.buildImage {
-                inherit (task.oci) name tag maxLayers contents config;
+                inherit (task.oci) name tag maxLayers layers contents config;
                 initializeNixDatabase = true;
               };
             };
@@ -699,7 +699,18 @@
             script = task.computedCommand;
             inherit (task.closure) closure;
           in {
-            layers = lib.mkDefault [rootDir];
+            layers = lib.mkDefault (
+              lib.optional (rootDir != null) (
+                pkgs.buildLayer {
+                  contents = [
+                    (pkgs.symlinkJoin {
+                      name = "rootDir";
+                      paths = [rootDir];
+                    })
+                  ];
+                }
+              )
+            );
 
             contents = lib.mkDefault [
               (pkgs.symlinkJoin {
