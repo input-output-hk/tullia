@@ -177,7 +177,7 @@
 
       config = {
         # NOTE: there has to be a better way to get the original value before `apply` ran?
-        env = task.oci.env;
+        inherit (task.oci) env;
 
         config =
           if task.nomad.driver == "podman"
@@ -661,7 +661,7 @@
 
                   Env = mkOption {
                     type = listOf str;
-                    default = pkgs.lib.mapAttrsToList (k: v: "${k}=${v}") ociConfig.env;
+                    default = lib.mapAttrsToList (k: v: "${k}=${v}") ociConfig.env;
                     inherit (ociOptions.env) description;
                   };
 
@@ -1201,7 +1201,9 @@
         in
           lib.filter lib.isAttrs mapped;
         description = ''
-          Information required by Cicero to push images.
+          Specification of steps Cicero's evaluator must run
+          to prepare all that is needed for job execution,
+          like pushing the OCI image the job references.
         '';
       };
     };
