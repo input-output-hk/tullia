@@ -16,10 +16,12 @@
           paths = let
             etc = pkgs.runCommand "etc" {} ''
               mkdir -p $out/etc
-              echo "nixbld:x:1000:nixbld1" > "$out/etc/group"
-              echo "nixbld1:x:1000:$gid:nixbld1:/local:/bin/sh" > "$out/etc/passwd"
-              echo "nixbld1:1000:100" > "$out/etc/subgid"
-              echo "nixbld1:1000:100" > "$out/etc/subuid"
+              cd $out/etc
+              echo > passwd 'nixbld1:x:1000:100:Nix build user 1:/local:/bin/sh'
+              echo > shadow 'nixbld1:!:1::::::'
+              echo > group  'nixbld:x:100:nixbld1'
+              echo > subgid 'nixbld1:1000:100'
+              echo > subuid 'nixbld1:1000:100'
             '';
           in [etc];
         }
