@@ -20,15 +20,15 @@ in {
   fail = {config ? {}, ...}:
     cmd "shell" "exit 10"
     // {
-      commands = pkgs.lib.mkMerge [
-        (pkgs.lib.mkOrder 1600 [
-          {
-            text = ''
-              echo this should be 10:
-              cat "/alloc/tullia-status-$TULLIA_TASK"
-            '';
-          }
-        ])
+      commands = pkgs.lib.mkAfter [
+        {
+          text = ''
+            echo These should be 10:
+            echo "$TULLIA_STATUS"
+            statusVar="TULLIA_STATUS_$TULLIA_TASK"
+            echo "''${!statusVar}"
+          '';
+        }
       ];
     };
 

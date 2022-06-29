@@ -39,25 +39,25 @@
       then builtins.readFile text
       else text;
 
-    makeCommand = idx: command:
+    makeCommand = command:
       writers.${command.type} {
         inherit name;
         inherit (command) runtimeInputs;
         text = getText command.text;
       };
 
-    mapCommand = idx: command:
+    mapCommand = command:
       if command.main
       then ''
-        status=0
-        ${makeCommand idx command}/bin/${name} || status="$?"
-        echo "$status" > /alloc/tullia-status-${name}
+        export TULLIA_STATUS=0
+        ${makeCommand command}/bin/${name} || TULLIA_STATUS="$?"
+        export TULLIA_STATUS_${name}="$TULLIA_STATUS"
       ''
-      else "${makeCommand idx command}/bin/${name}";
+      else "${makeCommand command}/bin/${name}";
 
     commandsWrapped = ''
-      ${lib.concatImapStringsSep "\n" mapCommand task.commands}
-      exit "$status"
+      ${lib.concatMapStringsSep "\n" mapCommand task.commands}
+      exit "$TULLIA_STATUS"
     '';
   in
     writers.shell {
