@@ -72,11 +72,12 @@ in rec {
       system: actions': (
         mapAttrs (
           actionName: action: let
-            inner = evalAction {
-              tasks = tasks.${system};
-              inherit rootDir;
-            }
-            system {${actionName} = action;};
+            inner =
+              evalAction {
+                tasks = tasks.${system};
+                inherit rootDir;
+              }
+              system {${actionName} = action;};
           in
             further: (inner ({name = actionName;} // further)).action.${actionName}
         )
