@@ -340,7 +340,7 @@
 
       command = mkOption {
         type = commandType task;
-        default = {text = "";};
+        default.text = "";
         description = ''
           Command to execute
         '';
@@ -695,10 +695,7 @@
             };
           };
 
-          config = let
-            script = task.computedCommand;
-            inherit (task.closure) closure;
-          in {
+          config = {
             layers = lib.mkDefault (
               lib.optional (rootDir != null) (
                 pkgs.buildLayer {
@@ -715,14 +712,16 @@
             contents = lib.mkDefault [
               (pkgs.symlinkJoin {
                 name = "root";
-                paths = [closure] ++ task.dependencies;
+                paths = [task.closure.closure] ++ task.dependencies;
               })
             ];
 
-            cmd = lib.mkDefault ["${script}/bin/${task.name}"];
-            env = lib.mapAttrs (key: value: lib.mkDefault value) task.env;
-            volumes."/local" = lib.mkDefault true;
-            volumes."/tmp" = lib.mkDefault true;
+            cmd = lib.mkDefault ["${task.computedCommand}/bin/${task.name}"];
+            env = lib.mapAttrs (key: lib.mkDefault) task.env;
+            volumes = {
+              "/local" = lib.mkDefault true;
+              "/tmp" = lib.mkDefault true;
+            };
           };
         });
       };
@@ -1049,8 +1048,7 @@
       unwrapped = mkOption {
         default = {};
         description = ''
-          Run the task without any container, useful for nested executions of
-          Tullia.
+          Run the task without any container, useful for nested executions of Tullia.
         '';
         type = submodule {
           options = {
@@ -1273,39 +1271,29 @@ in {
   in {
     dag = lib.mapAttrs (name: task: task.after) enabledTasks;
 
-    wrappedTask = let
-      bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
+    wrappedTask =
+      lib.mapAttrs (
+        name: task: lib.mkMerge [
+          # remove all readOnly options to make eval succeed
+          (builtins.removeAttrs task ["closure" "computedCommand" "command"])
 
-      spec = lib.escapeShellArg (builtins.toJSON {
-        inherit (config) dag;
-        inherit bin;
-      });
-    in
-      lib.mapAttrs' (
-        name: task: {
-          inherit name;
-          value = lib.mkMerge [
-            # remove all readOnly options to make eval succeed
-            (builtins.removeAttrs task ["closure" "computedCommand" "command"])
-
-            {
-              dependencies = [pkgs.tullia];
-              command.text = ''
-                exec tullia run ${lib.escapeShellArg name}
-              '';
-              env = {
-                RUN_SPEC = builtins.toJSON {
-                  inherit (config) dag;
-                  inherit bin;
-                };
-                MODE = "passthrough";
-                RUNTIME = "unwrapped";
+          {
+            dependencies = [pkgs.tullia];
+            command.text = ''
+              exec tullia run ${lib.escapeShellArg name}
+            '';
+            env = {
+              RUN_SPEC = builtins.toJSON {
+                inherit (config) dag;
+                bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
               };
-              nsjail.setsid = true;
-              oci.maxLayers = 30;
-            }
-          ];
-        }
+              MODE = "passthrough";
+              RUNTIME = "unwrapped";
+            };
+            nsjail.setsid = true;
+            oci.maxLayers = 30;
+          }
+        ]
       )
       enabledTasks;
   };
