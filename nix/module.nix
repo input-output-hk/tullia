@@ -471,6 +471,8 @@
             layers = mkOption {
               type = listOf package;
               default = [];
+              # to avoid failure in nix2container's makeNixDatabase
+              apply = lib.unique;
               description = ''
                 A list of layers built with the buildLayer function: if a store
                 path in deps or contents belongs to one of these layers, this
@@ -482,6 +484,8 @@
 
             contents = mkOption {
               type = listOf package;
+              # to avoid failure in nix2container's makeNixDatabase
+              apply = lib.unique;
               description = ''
                 A list of store paths to include in the layer root. The store
                 path prefix /nix/store/hash-path is removed. The store path
@@ -1282,27 +1286,69 @@ in {
 
     wrappedTask =
       lib.mapAttrs (
-        name: task: lib.mkMerge [
-          # remove all readOnly options to make eval succeed
-          (builtins.removeAttrs task ["closure" "computedCommand" "command"])
-
-          {
+        name: task:
+        # these must be removed to be assigned their default value that is based on other options
+          builtins.removeAttrs task ["computedCommand" "closure"]
+          // {
             dependencies = [pkgs.tullia];
+
             command.text = ''
               exec tullia run ${lib.escapeShellArg name}
             '';
+
+            # Discard other commands (e.g. those added by presets).
+            # These are meant for the wrapped task, not the wrapper.
+            commands = lib.mkForce [(moduleConfig.wrappedTask.${name}.command // {main = true;})];
+
             env = {
               RUN_SPEC = builtins.toJSON {
-                inherit (config) dag;
+                inherit (moduleConfig) dag;
                 bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
               };
               MODE = "passthrough";
               RUNTIME = "unwrapped";
             };
-            nsjail.setsid = true;
-            oci.maxLayers = 30;
+
+            nsjail =
+              # `run` must be removed to build a new derivation through the default value
+              builtins.removeAttrs task.nsjail ["run"]
+              // {
+                setsid = true;
+              };
+
+            # `run` must be removed to build a new derivation through the default value
+            podman = builtins.removeAttrs task.podman ["run"];
+
+            # these must be removed to configure a new image through their default values
+            oci = builtins.removeAttrs task.oci ["config" "image" "name" "cmd"];
+
+            nomad =
+              task.nomad
+              // {
+                config = builtins.removeAttrs task.nomad.config [
+                  # must be removed to build a new image for the wrapper through the default value
+                  "image"
+                ];
+
+                # propagate max dependencies' resources up to wrapper job
+                resources = lib.pipe task.after [
+                  (map (name: moduleConfig.wrappedTask.${name}.nomad.resources))
+                  (xs: xs ++ [task.nomad.resources])
+                  (
+                    lib.foldAttrs (
+                      a: b:
+                        if __elem null [a b]
+                        then
+                          if a == null
+                          then b
+                          else a
+                        else lib.max a b
+                    )
+                    null
+                  )
+                ];
+              };
           }
-        ]
       )
       enabledTasks;
   };
