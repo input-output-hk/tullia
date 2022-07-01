@@ -56,7 +56,19 @@
       else "${makeCommand command}/bin/${name}";
 
     commandsWrapped = ''
-      ${lib.concatMapStringsSep "\n" mapCommand task.commands}
+      ${lib.concatMapStringsSep "\n" mapCommand (
+        let
+          isMain = {main, ...}: main;
+          mainCommands = __filter isMain task.commands;
+        in
+          if __length mainCommands != 1
+          then
+            builtins.throw ''
+              There must be exactly one main command but task "${task.name}" has ${toString (__length mainCommands)}:
+              ${lib.concatMapStringsSep "\n" __toJSON (map (lib.filterAttrs (k: v: __elem k ["type" "text"])) mainCommands)}
+            ''
+          else task.commands
+      )}
       exit "$TULLIA_STATUS"
     '';
   in
