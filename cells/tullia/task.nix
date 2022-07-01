@@ -108,7 +108,7 @@ in {
     memory = 2 * 1024;
     preset.nix.enable = true;
     preset.github-ci = {
-      enable = config.action.facts or null != null;
+      enable = config.action.facts != {};
       repo = "input-output-hk/tullia";
       sha = config.action.facts.push.value.sha or "";
     };
