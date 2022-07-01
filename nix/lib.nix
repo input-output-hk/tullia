@@ -98,4 +98,17 @@ in rec {
     # nix eval --json .#cicero.x86_64-linux.ci --apply 'a: a { id = 1; inputs = {}; ociRegistry = ""; }'
     cicero = ciceroFromStd args;
   };
+
+  fromSimple = system: {
+    tasks ? {},
+    actions ? {},
+  }: let
+    tulliaStd = fromStd {
+      tasks.${system} = tasks;
+      actions.${system} = actions;
+    };
+  in {
+    tullia = tulliaStd.tullia.${system};
+    cicero = tulliaStd.cicero.${system};
+  };
 }
