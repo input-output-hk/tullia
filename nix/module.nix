@@ -1137,11 +1137,8 @@
 
             task = mkOption {
               default = {};
-              # FIXME: somehow the value of this apply ends up being the
-              # whole job first and thus doesn't match the type...
-              # type = attrsOf taskType;
-              type = attrsOf anything;
-              apply = lib.mapAttrs (name: value: (value.nomad or value));
+              type = attrsOf taskType;
+              apply = lib.mapAttrs (name: value: value.nomad or value);
               description = "Nomad job stanza";
             };
           };
