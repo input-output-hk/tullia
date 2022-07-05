@@ -32,6 +32,46 @@ in {
       type = "shell";
       runtimeInputs = with pkgs; [coreutils jq curl];
       text = ''
+        function duration {
+          local secs=$(($2 - $1))
+
+          local dh=$((secs / 3600))
+          if [[ $dh -gt 0 ]]; then
+            echo -n ''${dh}h
+          fi
+
+          local dm=$(((secs / 60) % 60))
+          if [[ $dm -gt 0 ]]; then
+            echo -n ''${dm}m
+          fi
+
+          local ds=$((secs % 60))
+          if [[ $ds -gt 0 ]]; then
+            echo -n ''${ds}s
+          fi
+
+          echo
+        }
+
+        function timer {
+          case "$1" in
+            start)
+              mkdir -p "/alloc/tullia/task/$TULLIA_TASK/github-ci"
+              date +%s > "/alloc/tullia/task/$TULLIA_TASK/github-ci/start-timestamp"
+              ;;
+            stop)
+              local start end
+              start=$(< "/alloc/tullia/task/$TULLIA_TASK/github-ci/start-timestamp")
+              end=$(date +%s)
+              duration "$start" "$end"
+              ;;
+            *)
+              echo >&2 "Unknown timer command: \"$1\""
+              exit 1
+              ;;
+          esac
+        }
+
         #shellcheck disable=SC2120
         function report {
           local state
@@ -60,10 +100,18 @@ in {
 
           local description
           case "$state" in
-            pending) description="Started $(date --rfc-3339=seconds)" ;;
-            success) description="" ;;
-            failure) description="Exited with ''${TULLIA_STATUS}" ;;
-            error | *) description=Error ;;
+            pending)
+              description="Started $(date --rfc-3339=seconds)"
+              timer start
+              ;;
+            success)
+              description="Took $(timer stop)" ;;
+            failure)
+              description="Exited with $TULLIA_STATUS after $(timer stop)"
+              ;;
+            error | *)
+              description="Error after $(timer stop)"
+              ;;
           esac
 
           echo >&2 -n "Reporting GitHub commit status $state on "${lib.escapeShellArg cfg.sha}" for \"$context\""
