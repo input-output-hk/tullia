@@ -46,12 +46,17 @@ in {
           fi
 
           local context=${
-            lib.pipe config.action.name or null [
-              (c: if c == null then "" else "${c}: ")
-              lib.escapeShellArg
-              (c: "${c}\"$TULLIA_TASK\"")
-            ]
-          }
+          lib.pipe config.action.name or null [
+            (
+              c:
+                if c == null
+                then ""
+                else "${c}: "
+            )
+            lib.escapeShellArg
+            (c: "${c}\"$TULLIA_TASK\"")
+          ]
+        }
 
           local description
           case "$state" in
@@ -95,22 +100,25 @@ in {
       commands = lib.mkMerge [
         # lib.mkBefore is 500 so this will always run before
         (lib.mkOrder 400 [
-          (reportStatus // {
-            # Merge cloning with reportStatus
-            # instead of cloning in a separate command
-            # so that reportStatus still traps ERR to report errors.
-            runtimeInputs = reportStatus.runtimeInputs ++ [pkgs.gitMinimal];
-            text = reportStatus.text + ''
-              if [[ -z "$(ls -1Aq)" ]]; then
-                git clone https://github.com/${lib.escapeShellArg cfg.repo} .
-                git checkout ${lib.escapeShellArg cfg.sha}
-              fi
-            '';
-          })
+          (reportStatus
+            // {
+              # Merge cloning with reportStatus
+              # instead of cloning in a separate command
+              # so that reportStatus still traps ERR to report errors.
+              runtimeInputs = reportStatus.runtimeInputs ++ [pkgs.gitMinimal];
+              text = ''
+                ${reportStatus.text}
+
+                if [[ -z "$(ls -1Aq)" ]]; then
+                  git clone https://github.com/${lib.escapeShellArg cfg.repo} .
+                  git checkout ${lib.escapeShellArg cfg.sha}
+                fi
+              '';
+            })
         ])
 
         # lib.mkAfter is 1500 so this will always run after
-        (lib.mkOrder 1600 [ reportStatus ])
+        (lib.mkOrder 1600 [reportStatus])
       ];
 
       nomad.template = [
