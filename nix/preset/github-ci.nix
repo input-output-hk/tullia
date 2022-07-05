@@ -28,81 +28,96 @@ in {
   };
 
   config = let
-    statusSetup = ''
-      trap 'rm -f "$secret_headers"' EXIT
-      secret_headers=$(mktemp)
+    reportStatus = {
+      type = "shell";
+      runtimeInputs = with pkgs; [coreutils jq curl];
+      text = ''
+        trap 'rm -f "$secret_headers"' EXIT
+        secret_headers=$(mktemp)
 
-      cat >> "$secret_headers" <<EOF
-      Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)
-      EOF
+        cat >> "$secret_headers" <<EOF
+        Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)
+        EOF
 
-      function report {
-        echo >&2 'Reporting GitHub commit status: '"$1"
+        #shellcheck disable=SC2120
+        function report {
+          local state
+          if [[ $# -ge 1 ]]; then
+            state="$1"
+          elif [[ -z "''${TULLIA_STATUS:-}" ]]; then
+            state=pending
+          elif [[ "$TULLIA_STATUS" = 0 ]]; then
+            state=success
+          else
+            state=failure
+          fi
 
-        local statusVar="TULLIA_STATUS_$TULLIA_TASK"
-        local description
-        if [[ -z "''${!statusVar:-}" ]]; then
-          description="Started $(date --rfc-3339=seconds)"
-        else
-          description='Exited with '"''${!statusVar}"
-        fi
+          local context=${
+            lib.pipe config.action.name or null [
+              (c: if c == null then "" else "${c}: ")
+              lib.escapeShellArg
+              (c: "${c}\"$TULLIA_TASK\"")
+            ]
+          }
 
-        jq -nc '{
-          state: $state,
-          context: "\($action_name): \(env.TULLIA_TASK)",
-          description: $description,
-          target_url: "\(env.CICERO_WEB_URL)/run/\($run_id)",
-        }' \
-          --arg state "$1" \
-          --arg description "$description" \
-          --arg run_id "$NOMAD_JOB_ID" \
-          --arg action_name ${lib.escapeShellArg config.action.name or ""} \
-        | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
-          --output /dev/null --fail-with-body \
-          --no-progress-meter \
-          -H 'Accept: application/vnd.github.v3+json' \
-          -H @"$secret_headers" \
-          --data-binary @-
-      }
+          local description
+          case "$state" in
+            pending) description="Started $(date --rfc-3339=seconds)" ;;
+            success) description="" ;;
+            failure) description="Exited with ''${TULLIA_STATUS}" ;;
+            error | *) description=Error ;;
+          esac
 
-      trap 'report error' ERR
-    '';
-    runtimeInputs = with pkgs; [coreutils jq curl gitMinimal];
+          echo >&2 -n "Reporting GitHub commit status $state on "${lib.escapeShellArg cfg.sha}" for \"$context\""
+          if [[ -n "$description" ]]; then
+            echo >&2 ": $description"
+          else
+            echo >&2
+          fi
+
+          jq -nc '{
+            state: $state,
+            context: $context,
+            description: $description,
+            target_url: "\(env.CICERO_WEB_URL)/run/\(env.NOMAD_JOB_ID)",
+          }' \
+            --arg state "$state" \
+            --arg description "$description" \
+            --arg context "$context" \
+          | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
+            --output /dev/null --fail-with-body \
+            --no-progress-meter \
+            -H 'Accept: application/vnd.github.v3+json' \
+            -H @"$secret_headers" \
+            --data-binary @-
+        }
+
+        trap 'report error' ERR
+
+        report
+      '';
+    };
   in
     lib.mkIf cfg.enable {
       commands = lib.mkMerge [
         # lib.mkBefore is 500 so this will always run before
         (lib.mkOrder 400 [
-          {
-            type = "shell";
-            inherit runtimeInputs;
-            text = ''
-              ${statusSetup}
-              report pending
-
+          (reportStatus // {
+            # Merge cloning with reportStatus
+            # instead of cloning in a separate command
+            # so that reportStatus still traps ERR to report errors.
+            runtimeInputs = reportStatus.runtimeInputs ++ [pkgs.gitMinimal];
+            text = reportStatus.text + ''
               if [[ -z "$(ls -1Aq)" ]]; then
                 git clone https://github.com/${lib.escapeShellArg cfg.repo} .
                 git checkout ${lib.escapeShellArg cfg.sha}
               fi
             '';
-          }
+          })
         ])
 
         # lib.mkAfter is 1500 so this will always run after
-        (lib.mkOrder 1600 [
-          {
-            type = "shell";
-            inherit runtimeInputs;
-            text = ''
-              ${statusSetup}
-              if [[ "$TULLIA_STATUS" = 0 ]]; then
-                report success
-              else
-                report failure
-              fi
-            '';
-          }
-        ])
+        (lib.mkOrder 1600 [ reportStatus ])
       ];
 
       nomad.template = [
