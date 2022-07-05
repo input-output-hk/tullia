@@ -13,7 +13,7 @@ in {
     repo = mkOption {
       type = types.str;
       description = ''
-        Path of the respository (the part after `github.com/`).
+        Path of the repository (the part after `github.com/`).
       '';
       example = "input-output-hk/tullia";
     };

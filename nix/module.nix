@@ -1088,11 +1088,7 @@
       };
     };
 
-    config = {
-      commands = lib.mkOrder 500 [
-        (task.command // {main = true;})
-      ];
-    };
+    config.commands = [(task.command // {main = true;})];
   });
 
   jobType = submodule {
