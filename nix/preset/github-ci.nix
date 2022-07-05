@@ -39,14 +39,22 @@ in {
       function report {
         echo >&2 'Reporting GitHub commit status: '"$1"
 
+        local statusVar="TULLIA_STATUS_$TULLIA_TASK"
+        local description
+        if [[ -z "''${!statusVar:-}" ]]; then
+          description="Started $(date --rfc-3339=seconds)"
+        else
+          description='Exited with '"''${!statusVar}"
+        fi
+
         jq -nc '{
           state: $state,
-          context: $action_name,
+          context: "\($action_name): \(env.TULLIA_TASK)",
           description: $description,
           target_url: "\(env.CICERO_WEB_URL)/run/\($run_id)",
         }' \
           --arg state "$1" \
-          --arg description "$(date --rfc-3339=seconds)" \
+          --arg description "$description" \
           --arg run_id "$NOMAD_JOB_ID" \
           --arg action_name ${lib.escapeShellArg config.action.name or ""} \
         | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
