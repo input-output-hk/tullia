@@ -32,13 +32,6 @@ in {
       type = "shell";
       runtimeInputs = with pkgs; [coreutils jq curl];
       text = ''
-        trap 'rm -f "$secret_headers"' EXIT
-        secret_headers=$(mktemp)
-
-        cat >> "$secret_headers" <<EOF
-        Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)
-        EOF
-
         #shellcheck disable=SC2120
         function report {
           local state
@@ -88,7 +81,7 @@ in {
             --output /dev/null --fail-with-body \
             --no-progress-meter \
             -H 'Accept: application/vnd.github.v3+json' \
-            -H @"$secret_headers" \
+            -H @<(echo "Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)") \
             --data-binary @-
         }
 
