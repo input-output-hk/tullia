@@ -8,16 +8,12 @@
 }: let
   inherit (lib) mkOption;
   inherit (lib.types) attrsOf submodule attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path;
-  inherit (builtins) concatStringsSep filter isString split toJSON typeOf;
-
-  pp2 = a: b: __trace (__toJSON a) b;
-  pp = a: __trace (__toJSON a) a;
 
   sanitizeServiceName = name:
     lib.pipe name [
-      (split "[^[:alnum:]-]+")
-      (filter isString)
-      (concatStringsSep "-")
+      (__split "[^[:alnum:]-]+")
+      (__filter __isString)
+      (__concatStringsSep "-")
     ];
 
   getImageName = image: "${image.imageName}:${image.imageTag}";
@@ -35,8 +31,8 @@
 
     # TODO: some writers may prefer a file path?
     getText = text:
-      if builtins.isPath text
-      then builtins.readFile text
+      if __isPath text
+      then __readFile text
       else text;
 
     makeCommand = command:
@@ -64,7 +60,7 @@
         in
           if __length mainCommands != 1
           then
-            builtins.throw ''
+            throw ''
               There must be exactly one main command but task "${task.name}" has ${toString (__length mainCommands)}:
               ${lib.concatMapStringsSep "\n" __toJSON (map (lib.filterAttrs (k: v: __elem k ["type" "text"])) mainCommands)}
             ''
@@ -822,7 +818,7 @@
                   to,
                   type,
                   options,
-                }: "${from}:${to}:${type}:${lib.concatStringsSep "," (lib.mapAttrsToList (
+                }: "${from}:${to}:${type}:${__concatStringsSep "," (lib.mapAttrsToList (
                     n: v: let
                       converted =
                         if n == "size"
@@ -1078,7 +1074,7 @@
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies;
                 text = ''
-                  ${lib.concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+                  ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
                   ${task.computedCommand}/bin/${task.name}
                 '';
               };
@@ -1218,7 +1214,7 @@
             action.job
           );
         in
-          lib.filter lib.isAttrs mapped;
+          __filter lib.isAttrs mapped;
         description = ''
           Specification of steps Cicero's evaluator must run
           to prepare all that is needed for job execution,
@@ -1285,7 +1281,7 @@ in {
       lib.mapAttrs (
         name: task:
         # these must be removed to be assigned their default value that is based on other options
-          builtins.removeAttrs task ["computedCommand" "closure"]
+          removeAttrs task ["computedCommand" "closure"]
           // {
             dependencies = [pkgs.tullia];
 
@@ -1298,7 +1294,7 @@ in {
             commands = lib.mkForce [(moduleConfig.wrappedTask.${name}.command // {main = true;})];
 
             env = {
-              RUN_SPEC = builtins.toJSON {
+              RUN_SPEC = __toJSON {
                 inherit (moduleConfig) dag;
                 bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
               };
@@ -1308,21 +1304,21 @@ in {
 
             nsjail =
               # `run` must be removed to build a new derivation through the default value
-              builtins.removeAttrs task.nsjail ["run"]
+              removeAttrs task.nsjail ["run"]
               // {
                 setsid = true;
               };
 
             # `run` must be removed to build a new derivation through the default value
-            podman = builtins.removeAttrs task.podman ["run"];
+            podman = removeAttrs task.podman ["run"];
 
             # these must be removed to configure a new image through their default values
-            oci = builtins.removeAttrs task.oci ["config" "image" "name" "cmd"];
+            oci = removeAttrs task.oci ["config" "image" "name" "cmd"];
 
             nomad =
               task.nomad
               // {
-                config = builtins.removeAttrs task.nomad.config [
+                config = removeAttrs task.nomad.config [
                   # must be removed to build a new image for the wrapper through the default value
                   "image"
                 ];
