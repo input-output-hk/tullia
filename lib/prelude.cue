@@ -8,9 +8,9 @@ inputs: struct.MinFields(1) & {
 	}
 }
 
-output?: {
+output?: close({
 	success?: {}
 	failure?: {}
-}
+})
 
 _lib: [string]: {}
