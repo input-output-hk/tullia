@@ -158,8 +158,9 @@ in {
                 ${reportStatus.text}
 
                 if [[ -z "$(ls -1Aq)" ]]; then
-                  git clone https://github.com/${lib.escapeShellArg cfg.repo} .
-                  git checkout ${lib.escapeShellArg cfg.sha}
+                  git='git -c advice.detachedHead=false'
+                  $git clone https://github.com/${lib.escapeShellArg cfg.repo} .
+                  $git checkout ${lib.escapeShellArg cfg.sha}
                 fi
               '';
             })
