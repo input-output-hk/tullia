@@ -1165,6 +1165,9 @@
               then v
               else "- <<< ${lib.escapeShellArg v}"
             }
+
+            substituteInPlace $out \
+              --replace '// explicit error (_|_ literal) in source'$'\n' '''
           '';
         in
           lib.fileContents def;
