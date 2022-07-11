@@ -25,6 +25,8 @@ in {
         The Revision (SHA) of the commit to clone and report status on.
       '';
     };
+
+    clone = mkEnableOption "clone the repo" // {default = true;};
   };
 
   config = let
@@ -154,15 +156,15 @@ in {
               # instead of cloning in a separate command
               # so that reportStatus still traps ERR to report errors.
               runtimeInputs = reportStatus.runtimeInputs ++ [pkgs.gitMinimal];
-              text = ''
-                ${reportStatus.text}
-
-                if [[ -z "$(ls -1Aq)" ]]; then
-                  git='git -c advice.detachedHead=false'
-                  $git clone https://github.com/${lib.escapeShellArg cfg.repo} .
-                  $git checkout ${lib.escapeShellArg cfg.sha}
-                fi
-              '';
+              text =
+                reportStatus.text
+                + lib.optionalString cfg.clone ''
+                  if [[ -z "$(ls -1Aq)" ]]; then
+                    git='git -c advice.detachedHead=false'
+                    $git clone https://github.com/${lib.escapeShellArg cfg.repo} .
+                    $git checkout ${lib.escapeShellArg cfg.sha}
+                  fi
+                '';
             })
         ])
 
