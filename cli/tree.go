@@ -50,7 +50,7 @@ func (t *Tree) start() error {
 	t.prepareWG.Done()
 	t.startWG.Wait()
 
-	for _, vert := range t.dag.SourceVertices() {
+	for _, vert := range t.dag.SinkVertices() {
 		if task, ok := vert.Value.(*Task); !ok {
 			return fmt.Errorf("converting vertex of %q to task", vert.ID)
 		} else if task.err != nil {
