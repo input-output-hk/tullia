@@ -29,7 +29,6 @@
   computeCommand = task: let
     inherit (task) commands name;
 
-    # TODO: some writers may prefer a file path?
     getText = text:
       if __isPath text
       then __readFile text
