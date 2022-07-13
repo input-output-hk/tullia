@@ -27,6 +27,17 @@ in {
     };
 
     clone = mkEnableOption "clone the repo" // {default = true;};
+
+    lib = mkOption {
+      readOnly = true;
+      type = with types; attrsOf unspecified;
+      default.getRevision = fact: default: let
+        inherit (config.action.facts.${fact}.value) github-event;
+      in
+        github-event.pull_request.head.sha
+        or github-event.head_commit.id
+        or default;
+    };
   };
 
   config = let
