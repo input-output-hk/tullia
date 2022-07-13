@@ -47,7 +47,6 @@
         TULLIA_STATUS=0
         ${makeCommand command}/bin/${name} || TULLIA_STATUS="$?"
         export TULLIA_STATUS
-        export TULLIA_STATUS_${name}="$TULLIA_STATUS"
       ''
       else "${makeCommand command}/bin/${name}";
 
