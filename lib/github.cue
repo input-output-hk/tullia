@@ -1,10 +1,10 @@
 _lib: github: {
 	#input: string | *"GitHub event"
-	#repo:  string | *null
+	#repo?: string
 
 	pull_request?: {
 		#repo: =~"^[^/]+/[^/]+$"
-		if github.#repo != null {
+		if github.#repo != _|_ {
 			#repo: github.#repo
 		}
 		#target?:        string
@@ -13,7 +13,7 @@ _lib: github: {
 
 	push?: {
 		#repo: =~"^[^/]+/[^/]+$"
-		if github.#repo != null {
+		if github.#repo != _|_ {
 			#repo: github.#repo
 		}
 		#branch?:        string
@@ -22,60 +22,53 @@ _lib: github: {
 	}
 }
 
+
+let cfg_pr = _lib.github.pull_request
+let cfg_push = _lib.github.push
+
 inputs: "\(_lib.github.#input)": match: "github-event": or([
-							{// (indent is messed up by cue fmt)
-		let cfg = _lib.github.pull_request
+	if cfg_pr != _|_ { // (indent is messed up by cue fmt)
+		cfg_pr & {
+			action: "opened" | "reopened" | "synchronize"
 
-		if cfg != _|_ {
-			cfg & {
-				action: "opened" | "reopened" | "synchronize"
+			repository: full_name: cfg_pr.#repo
 
-				repository: full_name: cfg.#repo
-
-				pull_request: {
-					if cfg.#target != _|_ {
-						base: ref: cfg.#target
-					}
-
-					head: {
-						repo: clone_url: string
-						sha: string
-					}
+			pull_request: {
+				if cfg_pr.#target != _|_ {
+					base: ref: cfg_pr.#target
 				}
 
-				if cfg.#target_default {
-					pull_request: base: ref: repository.default_branch
-					repository: default_branch: string
-				}
+				head: sha: string
+			}
+
+			if cfg_pr.#target_default {
+				pull_request: base: ref: repository.default_branch
+				repository: default_branch: string
 			}
 		}
 	},
-	{
-		let cfg = _lib.github.push
+	if cfg_push != _|_ {
+		cfg_push & {
+			pusher: {}
+			deleted: false
+			repository: full_name: cfg_push.#repo
+			head_commit: id:       string
 
-		if cfg != _|_ {
-			cfg & {
-				pusher: {}
-				deleted: false
-				repository: full_name: cfg.#repo
-				head_commit: id:       string
+			ref: string
+			if cfg_push.#branch != _|_ || cfg_push.#tag != _|_ {
+				ref: or([
+					if cfg_push.#branch != _|_ {
+						=~"^refs/heads/\(cfg_push.#branch)$"
+					},
+					if cfg_push.#tag != _|_ {
+						=~"^refs/tags/\(cfg_push.#tag)$"
+					},
+				])
+			}
 
-				ref: string
-				if cfg.#branch != _|_ || cfg.#tag != _|_ {
-					ref: or([
-						if cfg.#branch != _|_ {
-							=~"^refs/heads/\(cfg.#branch)$"
-						},
-						if cfg.#tag != _|_ {
-							=~"^refs/tags/\(cfg.#tag)$"
-						},
-					])
-				}
-
-				if cfg.#default_branch {
-					_lib: github: push: #branch: repository.default_branch
-					repository: default_branch: string
-				}
+			if cfg_push.#default_branch {
+				_lib: github: push: #branch: repository.default_branch
+				repository: default_branch: string
 			}
 		}
 	},
