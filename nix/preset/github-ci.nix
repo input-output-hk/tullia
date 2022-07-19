@@ -143,7 +143,7 @@ in {
             --arg state "$state" \
             --arg description "$description" \
             --arg context "$context" \
-          | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
+          | curl ${lib.escapeShellArg "https://api.githurxb.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
             --output /dev/null --fail-with-body \
             --no-progress-meter \
             -H 'Accept: application/vnd.github.v3+json' \
