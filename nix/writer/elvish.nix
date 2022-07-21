@@ -9,7 +9,7 @@
   check ? true,
 }:
 writeTextFile {
-  inherit name;
+  name = "${name}.elv";
   executable = true;
   destination = "/bin/${name}";
   text = ''

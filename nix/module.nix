@@ -6,7 +6,7 @@
   ociRegistry,
   ...
 }: let
-  inherit (lib) mkOption;
+  inherit (lib) mkOption mkEnableOption;
   inherit (lib.types) attrsOf submodule attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path;
 
   sanitizeServiceName = name:
@@ -21,6 +21,7 @@
   moduleConfig = config;
 
   writers = {
+    nushell = pkgs.callPackage ./writer/nushell.nix {};
     shell = pkgs.callPackage ./writer/shell.nix {};
     elvish = pkgs.callPackage ./writer/elvish.nix {};
     ruby = pkgs.callPackage ./writer/ruby.nix {};
@@ -250,19 +251,25 @@
       nix = import ./preset/nix.nix;
       bash = import ./preset/bash.nix;
       github-ci = import ./preset/github-ci.nix;
+      github-checks = import ./preset/github-checks.nix;
     };
   in {
     imports =
       [
         {
-          _module.args = {inherit pkgs;};
+          _module.args = {inherit pkgs writers task getImageName;};
           preset.bash.enable = lib.mkDefault true;
         }
+        ./module/bubblewrap.nix
+        ./module/nsjail.nix
+        ./module/podman.nix
+        ./module/docker.nix
+        ./module/unwrapped.nix
       ]
       ++ (lib.attrValues presets);
 
     options = {
-      enable = lib.mkEnableOption "the task" // {default = true;};
+      enable = mkEnableOption "the task" // {default = true;};
 
       after = mkOption {
         type = listOf str;
@@ -416,7 +423,7 @@
       };
 
       runtime = mkOption {
-        type = enum ["nsjail" "podman" "unwrapped"];
+        type = enum ["nsjail" "bubblewrap" "podman" "docker" "unwrapped"];
         default = "nsjail";
         description = ''
           The runtime determines how tullia executes the task. This directly
@@ -449,7 +456,7 @@
             image = mkOption {
               type = package;
               default = pkgs.buildImage {
-                inherit (task.oci) name tag maxLayers layers contents config;
+                inherit (task.oci) name tag maxLayers layers copyToRoot config;
                 initializeNixDatabase = true;
               };
             };
@@ -471,14 +478,14 @@
               apply = lib.unique;
               description = ''
                 A list of layers built with the buildLayer function: if a store
-                path in deps or contents belongs to one of these layers, this
+                path in deps or copyToRoot belongs to one of these layers, this
                 store path is skipped. This is pretty useful to isolate store
                 paths that are often updated from more stable store paths, to
                 speed up build and push time.
               '';
             };
 
-            contents = mkOption {
+            copyToRoot = mkOption {
               type = listOf package;
               # to avoid failure in nix2container's makeNixDatabase
               apply = lib.unique;
@@ -711,7 +718,7 @@
             layers = lib.mkDefault (
               lib.optional (rootDir != null) (
                 pkgs.buildLayer {
-                  contents = [
+                  copyToRoot = [
                     (pkgs.symlinkJoin {
                       name = "rootDir";
                       paths = [rootDir];
@@ -721,7 +728,7 @@
               )
             );
 
-            contents = lib.mkDefault [
+            copyToRoot = lib.mkDefault [
               (pkgs.symlinkJoin {
                 name = "root";
                 paths = [task.closure.closure] ++ task.dependencies;
@@ -741,345 +748,6 @@
       nomad = mkOption {
         default = {};
         type = taskNomadType config;
-      };
-
-      podman = mkOption {
-        default = {};
-        type = submodule (podman: {
-          options = {
-            run = mkOption {
-              type = package;
-              description = ''
-                Copy the task to local podman and execute it
-              '';
-              default = let
-                flags = {
-                  v = [
-                    ''"$alloc:/alloc"''
-                    ''"$HOME/.netrc:/local/.netrc"''
-                    ''"$HOME/.docker/config.json:/local/.docker/config.json"''
-                    ''"$PWD:/repo"''
-                  ];
-                  rmi = false;
-                  rm = true;
-                  # tty = false;
-                  # interactive = true;
-                };
-                imageName = getImageName config.oci.image;
-              in
-                writers.shell {
-                  name = "${config.name}-podman";
-                  runtimeInputs = [pkgs.coreutils-full pkgs.podman config.oci.image.copyTo];
-                  text = ''
-                    # Podman _can_ work without new(g|u)idmap, but user
-                    # mapping will be a bit wonky.
-                    # The problem is that they require suid, so we have to
-                    # point to the impure location of them.
-                    suidDir="$(dirname "$(command -v newuidmap)")"
-                    export PATH="$PATH:$suidDir"
-                    alloc="''${alloc:-$(mktemp -d -t alloc.XXXXXXXXXX)}"
-                    function finish {
-                      rm -rf "$alloc"
-                    }
-                    trap finish EXIT
-                    copy-to containers-storage:${imageName}
-                    if tty -s; then
-                      echo "" | exec podman run --tty ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
-                    else
-                      echo "" | exec podman run ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
-                    fi
-                  '';
-                };
-            };
-
-            useHostStore = mkOption {
-              type = bool;
-              default = true;
-            };
-          };
-        });
-      };
-
-      nsjail = mkOption {
-        default = {};
-        type = submodule {
-          options = {
-            run = mkOption {
-              type = package;
-              description = ''
-                Execute the task in a nsjail sandbox
-              '';
-              default = let
-                c = config.nsjail;
-
-                toMountFlag = lib.mapAttrsToList (_: {
-                  from,
-                  to,
-                  type,
-                  options,
-                }: "${from}:${to}:${type}:${__concatStringsSep "," (lib.mapAttrsToList (
-                    n: v: let
-                      converted =
-                        if n == "size"
-                        then v * 1024 * 1024 # megabytes to bytes
-                        else v;
-                    in "${n}=${toString converted}"
-                  )
-                  options)}");
-
-                flags = {
-                  quiet = c.quiet;
-                  verbose = c.verbose;
-                  time_limit = c.timeLimit;
-                  disable_clone_newnet = !c.cloneNewnet;
-                  rlimit_as = c.rlimit.as;
-                  rlimit_core = c.rlimit.core;
-                  rlimit_cpu = c.rlimit.cpu;
-                  rlimit_fsize = c.rlimit.fsize;
-                  rlimit_nofile = c.rlimit.nofile;
-                  rlimit_nproc = c.rlimit.nproc;
-                  rlimit_stack = c.rlimit.stack;
-                  cgroup_cpu_ms_per_sec = c.cgroup.cpuMsPerSec;
-                  cgroup_mem_max = c.cgroup.memMax;
-                  cgroup_net_cls_classid = c.cgroup.netClsClassid;
-                  cgroup_pids_max = c.cgroup.pidsMax;
-                  skip_setsid = !c.setsid;
-                  cwd = c.cwd;
-                  bindmount = c.bindmount.rw;
-                  bindmount_ro = c.bindmount.ro;
-                  mount = toMountFlag c.mount;
-                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") (config.env);
-                };
-              in
-                writers.shell {
-                  name = "${config.name}-nsjail";
-                  runtimeInputs = with pkgs; [coreutils nsjail];
-                  text = ''
-                    # TODO: This is tied to systemd... find a way to make it cross-platform.
-                    uid="''${UID:-$(id -u)}"
-                    gid="''${GID:-$(id -g)}"
-
-                    cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
-                    if [ ! -d "$cgroupV2Mount" ]; then
-                      unset cgroupV2Mount
-                    fi
-
-                    alloc="''${alloc:-$(mktemp -d -t alloc.XXXXXXXXXX)}"
-                    root="$(mktemp -d -t root.XXXXXXXXXX)"
-                    mkdir -p "$root"/{etc,tmp,local,bin,usr/bin}
-                    ln -s ${pkgs.bashInteractive}/bin/sh "$root/bin/sh"
-                    ln -s ${pkgs.coreutils}/usr/bin/env "$root/usr/bin/env"
-
-                    function finish {
-                      status="$?"
-                      chmod u+w -R "$root" 2>/dev/null
-                      rm -rf "$alloc" "$root"
-                      exit "$status"
-                    }
-                    trap finish EXIT
-
-                    echo "nixbld:x:$uid:nixbld1" > "$root/etc/group"
-                    echo "nixbld1:x:$uid:$gid:nixbld 1:/local:${pkgs.shadow}/bin/nologin" > "$root/etc/passwd"
-                    echo "nixbld1:$gid:100" > "$root/etc/subgid"
-                    echo "nixbld1:$uid:100" > "$root/etc/subuid"
-
-                    nsjail -Mo ${toString (lib.cli.toGNUCommandLine {} flags)} \
-                      --user "$uid" \
-                      --group "$gid" \
-                      ''${cgroupV2Mount:+--use_cgroupv2} \
-                      ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${config.name}"}
-                  '';
-                };
-            };
-
-            setsid = mkOption {
-              type = bool;
-              default = true;
-              description = ''
-                setsid runs a program in a new session.
-                Disabling this allows for terminal signal handling in the
-                sandboxed process which may be dangerous.
-              '';
-            };
-
-            quiet = mkOption {
-              type = bool;
-              default = true;
-            };
-
-            verbose = mkOption {
-              type = bool;
-              default = false;
-            };
-
-            timeLimit = mkOption {
-              type = ints.unsigned;
-              default = 30;
-            };
-
-            cloneNewnet = mkOption {
-              type = bool;
-              default = false;
-            };
-
-            cwd = mkOption {
-              type = str;
-              default = task.workingDir;
-              description = "change to this directory before starting the script startup";
-            };
-
-            bindmount = mkOption {
-              default = {};
-              type = submodule {
-                options = {
-                  rw = mkOption {
-                    type = listOf str;
-                    default = [];
-                  };
-
-                  ro = mkOption {
-                    type = listOf str;
-                    default = [];
-                  };
-                };
-              };
-            };
-
-            mount = mkOption {
-              default = {};
-
-              type = attrsOf (submodule
-                ({name, ...}: {
-                  options = {
-                    from = mkOption {
-                      type = str;
-                      default = "none";
-                    };
-
-                    to = mkOption {
-                      type = str;
-                      default = name;
-                    };
-
-                    type = mkOption {
-                      type = enum ["tmpfs"];
-                      default = "tmpfs";
-                    };
-
-                    options = mkOption {
-                      type = attrsOf anything;
-                    };
-                  };
-                }));
-            };
-
-            cgroup = mkOption {
-              default = {};
-              type = submodule {
-                options = {
-                  memMax = mkOption {
-                    type = ints.unsigned;
-                    default = task.memory * 1024 * 1024;
-                    description = "Maximum number of bytes to use in the group. 0 is disabled";
-                  };
-
-                  pidsMax = mkOption {
-                    type = ints.unsigned;
-                    default = 0;
-                    description = "Maximum number of pids in a cgroup. 0 is disabled";
-                  };
-
-                  netClsClassid = mkOption {
-                    type = ints.unsigned;
-                    default = 0;
-                    description = "Class identifier of network packets in the group. 0 is disabled";
-                  };
-
-                  cpuMsPerSec = mkOption {
-                    type = ints.unsigned;
-                    default = 0;
-                    description = "Number of milliseconds of CPU time per second that the process group can use. 0 is disabled";
-                  };
-                };
-              };
-            };
-
-            rlimit = mkOption {
-              default = {};
-              type = submodule {
-                options = {
-                  as = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "max";
-                    description = "virtual memory size limit in MB";
-                  };
-
-                  core = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "max";
-                    description = "CPU time in seconds";
-                  };
-
-                  cpu = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "max";
-                    description = "CPU time in seconds";
-                  };
-
-                  fsize = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "max";
-                    description = "Maximum file size.";
-                  };
-
-                  nofile = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "max";
-                    description = "Maximum number of open files.";
-                  };
-
-                  nproc = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "soft";
-                    description = "Maximum number of processes.";
-                  };
-
-                  stack = mkOption {
-                    type = oneOf [(enum ["max" "hard" "def" "soft" "inf"]) ints.unsigned];
-                    default = "inf";
-                    description = "Maximum size of the stack.";
-                  };
-                };
-              };
-            };
-          };
-        };
-      };
-
-      unwrapped = mkOption {
-        default = {};
-        description = ''
-          Run the task without any container, useful for nested executions of Tullia.
-        '';
-        type = submodule {
-          options = {
-            run = mkOption {
-              type = package;
-              description = ''
-                Run the task without any container.
-              '';
-              default = writers.shell {
-                name = "${task.name}-unwrapped";
-                runtimeInputs = task.dependencies;
-                text = ''
-                  ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                  exec ${task.computedCommand}/bin/${task.name}
-                '';
-              };
-            };
-          };
-        };
       };
     };
 

@@ -11,7 +11,7 @@
   check ? true,
 }:
 writeTextFile {
-  inherit name;
+  name = "${name}.sh";
   executable = true;
   destination = "/bin/${name}";
   text = ''

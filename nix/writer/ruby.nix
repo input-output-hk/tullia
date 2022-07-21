@@ -10,7 +10,7 @@
   check ? true,
 }:
 writeTextFile {
-  inherit name;
+  name = "${name}.rb";
   executable = true;
   destination = "/bin/${name}";
   text = let
