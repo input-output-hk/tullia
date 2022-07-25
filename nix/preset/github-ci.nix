@@ -32,10 +32,10 @@ in {
       readOnly = true;
       type = with types; attrsOf unspecified;
       default.getRevision = fact: default: let
-        inherit (config.action.facts.${fact}.value) github-event;
+        inherit (config.action.facts.${fact}.value) github_body;
       in
-        github-event.pull_request.head.sha
-        or github-event.head_commit.id
+        github_body.pull_request.head.sha
+        or github_body.head_commit.id
         or default;
     };
   };
