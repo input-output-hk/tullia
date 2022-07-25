@@ -22,62 +22,64 @@ _lib: github: {
 	}
 }
 
-
 let cfg_pr = _lib.github.pull_request
 let cfg_push = _lib.github.push
 
-inputs: "\(_lib.github.#input)": match: "github-event": or([
-	if cfg_pr != _|_ { // (indent is messed up by cue fmt)
-		cfg_pr & {
-			action: "opened" | "reopened" | "synchronize"
+inputs: "\(_lib.github.#input)": match: {
+	github_event: string
+	github_body:  or([
+			if cfg_pr != _|_ {// (indent is messed up by cue fmt)
+			cfg_pr & {
+				action: "opened" | "reopened" | "synchronize"
 
-			repository: full_name: cfg_pr.#repo
+				repository: full_name: cfg_pr.#repo
 
-			pull_request: {
-				if cfg_pr.#target != _|_ {
-					base: ref: cfg_pr.#target
+				pull_request: {
+					if cfg_pr.#target != _|_ {
+						base: ref: cfg_pr.#target
+					}
+
+					head: sha: string
 				}
 
-				head: sha: string
+				if cfg_pr.#target_default {
+					pull_request: base: ref: repository.default_branch
+					repository: default_branch: string
+				}
 			}
+		},
+		if cfg_push != _|_ {
+			cfg_push & {
+				pusher: {}
+				deleted: false
+				repository: full_name: cfg_push.#repo
+				head_commit: id:       string
 
-			if cfg_pr.#target_default {
-				pull_request: base: ref: repository.default_branch
-				repository: default_branch: string
-			}
-		}
-	},
-	if cfg_push != _|_ {
-		cfg_push & {
-			pusher: {}
-			deleted: false
-			repository: full_name: cfg_push.#repo
-			head_commit: id:       string
+				ref: string
+				if cfg_push.#branch != _|_ || cfg_push.#tag != _|_ {
+					ref: or([
+						if cfg_push.#branch != _|_ {
+							=~"^refs/heads/\(cfg_push.#branch)$"
+						},
+						if cfg_push.#tag != _|_ {
+							=~"^refs/tags/\(cfg_push.#tag)$"
+						},
+					])
+				}
 
-			ref: string
-			if cfg_push.#branch != _|_ || cfg_push.#tag != _|_ {
-				ref: or([
-					if cfg_push.#branch != _|_ {
-						=~"^refs/heads/\(cfg_push.#branch)$"
-					},
-					if cfg_push.#tag != _|_ {
-						=~"^refs/tags/\(cfg_push.#tag)$"
-					},
-				])
+				if cfg_push.#default_branch {
+					_lib: github: push: #branch: repository.default_branch
+					repository: default_branch: string
+				}
 			}
-
-			if cfg_push.#default_branch {
-				_lib: github: push: #branch: repository.default_branch
-				repository: default_branch: string
-			}
-		}
-	},
-])
+		},
+	])
+}
 
 output: {
 	success: ok: true
 
-	let event = inputs[_lib.github.#input].value."github-event"
+	let event = inputs[_lib.github.#input].value.github_body
 
 	[string]: revision:
 		event.pull_request.head.sha | // PR
