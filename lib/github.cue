@@ -1,87 +1,120 @@
-_lib: github: {
-	#input: string | *"GitHub event"
-	#repo?: string
+#lib: io: {
+	github_pr: {
+		#input: {
+			result: string | *"GitHub PR to \(#repo)\(_target)\(_target_default)"
 
-	pull_request?: {
-		#repo: =~"^[^/]+/[^/]+$"
-		if github.#repo != _|_ {
-			#repo: github.#repo
-		}
+			_target: *" against branch \(#target)" | ""
+
+			_target_default: string
+			if #target_default {
+				_target_default: " against default branch"
+			}
+			if !#target_default {
+				_target_default: ""
+			}
+		}.result
+
+		#repo:           =~"^[^/]+/[^/]+$"
 		#target?:        string
 		#target_default: bool | *true
-	}
 
-	push?: {
-		#repo: =~"^[^/]+/[^/]+$"
-		if github.#repo != _|_ {
-			#repo: github.#repo
+		if #target != _|_ {
+			#target_default: false
 		}
-		#branch?:        string
-		#tag?:           string
-		#default_branch: bool | *true
-	}
-}
 
-let cfg_pr = _lib.github.pull_request
-let cfg_push = _lib.github.push
-
-inputs: "\(_lib.github.#input)": match: {
-	github_event: string
-	github_body:  or([
-			if cfg_pr != _|_ {// (indent is messed up by cue fmt)
-			cfg_pr & {
+		inputs: "\(#input)": match: {
+			github_event: "pull_request"
+			github_body: {
 				action: "opened" | "reopened" | "synchronize"
 
-				repository: full_name: cfg_pr.#repo
+				repository: full_name: #repo
 
 				pull_request: {
-					if cfg_pr.#target != _|_ {
-						base: ref: cfg_pr.#target
+					if #target != _|_ {
+						base: ref: #target
 					}
 
 					head: sha: string
 				}
 
-				if cfg_pr.#target_default {
+				if #target_default {
 					pull_request: base: ref: repository.default_branch
 					repository: default_branch: string
 				}
 			}
-		},
-		if cfg_push != _|_ {
-			cfg_push & {
-				pusher: {}
+		}
+
+		output: {
+			success: ok: true
+			failure: ok: false
+
+			#revision: bool | *true
+			if #revision {
+				[string]: revision: inputs["\(#input)"].value.github_body.pull_request.head.sha
+			}
+		}
+	}
+
+	github_push: {
+		#input: {
+			result: string | *"GitHub Push to \(#repo)\(_branch)\(_default_branch)\(_tag)"
+
+			_branch: *" on branch \(#branch)" | ""
+
+			_default_branch: string
+			if #default_branch {
+				_default_branch: " on default branch"
+			}
+			if !#default_branch {
+				_default_branch: ""
+			}
+
+			_tag: *" on tag \(#tag)" | ""
+		}.result
+
+		#repo:           =~"^[^/]+/[^/]+$"
+		#branch?:        string
+		#tag?:           string
+		#default_branch: bool | *true
+
+		if #branch != _|_ {
+			#default_branch: false
+		}
+
+		inputs: "\(#input)": match: {
+			github_event: "push"
+			github_body: {
 				deleted: false
-				repository: full_name: cfg_push.#repo
+				repository: full_name: #repo
 				head_commit: id:       string
 
 				ref: string
-				if cfg_push.#branch != _|_ || cfg_push.#tag != _|_ {
+				if #branch != _|_ || #tag != _|_ {
 					ref: or([
-						if cfg_push.#branch != _|_ {
-							=~"^refs/heads/\(cfg_push.#branch)$"
+						if #branch != _|_ {
+							=~"^refs/heads/\(#branch)$"
 						},
-						if cfg_push.#tag != _|_ {
-							=~"^refs/tags/\(cfg_push.#tag)$"
+						if #tag != _|_ {
+							=~"^refs/tags/\(#tag)$"
 						},
 					])
 				}
 
-				if cfg_push.#default_branch {
-					_lib: github: push: #branch: repository.default_branch
+				if #default_branch {
+					ref: "refs/heads/\(repository.default_branch)"
 					repository: default_branch: string
 				}
 			}
-		},
-	])
-}
+		}
 
-output: {
-	success: ok: true
+		output: {
+			success: ok: true
+			failure: ok: false
 
-	let event = inputs[_lib.github.#input].value.github_body
-
-	[string]: revision:
-		event.pull_request.head.sha | // PR
-		event.head_commit.id // push
+			#revision: bool | *true
+			if #revision {
+				[string]: revision: inputs["\(#input)"].value.github_body.head_commit.id
+			}
+		}
+	}
 }

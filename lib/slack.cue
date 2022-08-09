@@ -1,13 +1,8 @@
-_lib: slack: message?: {
+#lib: io: slack_message: {
 	#input: string | *"Slack Message"
 	#channels?: [...string]
-	#user?: string
-	#msg?:  string
-}
+	#user?:    string
+	#message?: string
 
-let cfg = _lib.slack.message
-
-if cfg != _|_ {
-	inputs: "\(cfg.#input)": match: cfg & {
-	}
+	inputs: "\(#input)": match: {}
 }
