@@ -1158,11 +1158,14 @@
               ${../lib/prelude.cue} \
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
+              - <<< ${lib.escapeShellArg ''
+              #lib: _ // convenience to make references work
               ${
-              if __isPath v
-              then v
-              else "- <<< ${lib.escapeShellArg v}"
-            }
+                if __isPath v
+                then __readFile v
+                else v
+              }
+            ''}
 
             substituteInPlace $out \
               --replace '// explicit error (_|_ literal) in source'$'\n' '''
