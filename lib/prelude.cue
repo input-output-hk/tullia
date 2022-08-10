@@ -33,14 +33,12 @@ for io in #lib.ios {
 		inputs: "\(k)": {
 			match: or([ for io2 in #lib.ios {io2.inputs[k].match}])
 
-			not?: and([ for io2 in #lib.ios {io2.inputs[k].not}])
 			if v.not != _|_ {
-				not?: v.not
+				not: v.not
 			}
 
-			optional?: and([ for io2 in #lib.ios {io2.inputs[k].optional}])
 			if v.optional != _|_ {
-				optional?: v.optional
+				optional: v.optional
 			}
 		}
 	}
