@@ -3,9 +3,9 @@ import "struct"
 #inputs: struct.MinFields(1) & {
 	[string]: {
 		match: {...}
-		value:     match // injected by cicero
 		not?:      bool
 		optional?: bool
+		...
 	}
 }
 
@@ -43,5 +43,11 @@ for io in #lib.ios {
 		}
 	}
 
-	output: io.output
+	output: {
+		io
+		inputs: _final_inputs
+	}.output
 }
+
+// XXX Why does a let declaration not work here?
+_final_inputs: inputs

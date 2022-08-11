@@ -49,8 +49,9 @@
 			failure: ok: false
 
 			#revision: bool | *true
-			if #revision {
-				[string]: revision: inputs["\(#input)"].value.github_body.pull_request.head.sha
+			let revision_ = inputs["\(#input)"].value.github_body.pull_request.head.sha
+			if #revision && revision_ != _|_ {
+				[string]: revision: revision_
 			}
 		}
 	}
@@ -112,8 +113,9 @@
 			failure: ok: false
 
 			#revision: bool | *true
-			if #revision {
-				[string]: revision: inputs["\(#input)"].value.github_body.head_commit.id
+			let revision_ = inputs["\(#input)"].value.github_body.head_commit.id
+			if #revision && revision_ != _|_ {
+				[string]: revision: revision_
 			}
 		}
 	}
