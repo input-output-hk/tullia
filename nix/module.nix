@@ -1291,12 +1291,6 @@ in {
       description = "Cicero actions.";
     };
 
-    job = mkOption {
-      default = {};
-      type = attrsOf jobType;
-      description = "A nomad job.".
-    };
-
     task = mkOption {
       default = {};
       type = attrsOf taskType;
