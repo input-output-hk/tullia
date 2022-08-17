@@ -652,7 +652,7 @@
               default = {};
               type = submodule (imageConfig: {
                 options = let
-                  toGoStruct = m: lib.mapAttrs (k: v: {}) (lib.filterAttrs (k: v: v) m);
+                  toGoStruct = m: __mapAttrs (k: v: {}) (lib.filterAttrs (k: v: v) m);
                 in {
                   Cmd = mkOption {
                     default = ociConfig.cmd;
@@ -728,7 +728,7 @@
             ];
 
             cmd = lib.mkDefault ["${task.computedCommand}/bin/${task.name}"];
-            env = lib.mapAttrs (key: lib.mkDefault) task.env;
+            env = __mapAttrs (_: lib.mkDefault) task.env;
             volumes = {
               "/local" = lib.mkDefault true;
               "/tmp" = lib.mkDefault true;
@@ -1218,7 +1218,7 @@
             action.job
           );
         in
-          __filter lib.isAttrs mapped;
+          __filter __isAttrs mapped;
         description = ''
           Specification of steps Cicero's evaluator must run
           to prepare all that is needed for job execution,
@@ -1229,60 +1229,102 @@
 
     config = lib.mkIf (action.task != null) (let
       sname = sanitizeServiceName name;
+      t = moduleConfig.wrappedTask.${action.task};
     in {
-      job.${sname}.group.tullia.task.tullia = moduleConfig.wrappedTask.${action.task};
+      job.${sname}.group.tullia.task.tullia = t.nomad or t;
     });
   });
+
+  nomadTypes = let
+    original = (lib.evalModules {
+      modules = map (m: "${pkgs.nix-nomad}/modules/${m}.nix") [
+        "lib"
+        "generated"
+      ];
+    })._module.types;
+  in original // {
+    # We cannot directly modify the type because
+    # `fixupOptionType` from `nixpkgs/lib/modules.nix`
+    # never looks at it. Instead it only evaluates
+    # `substSubModules` so we have to sneak in there.
+    # TODO Looks like a general problem with the `submodule` type. Fix upstream?
+    Job = let
+      outer = attrsOf original.Job;
+    in outer // {
+      substSubModules = m:
+        lib.pipe outer [
+          (t: t.substSubModules m)
+
+          (t: addCheck t (jobs: __length (__attrNames jobs) <= 1))
+
+          # Remove the `name` and `id` options in the merge function.
+          # Would be great if we could simply remove these options
+          # from the submodule altogether but that seems much more tedious.
+          (t: t // {
+            merge = loc: defs:
+              let
+                jobs = t.merge loc defs;
+                removeNameAndId = lib.flip removeAttrs ["name" "id"];
+              in
+                __mapAttrs (_: job: (removeNameAndId job) // {
+                  group = __mapAttrs (_: group: (removeNameAndId group) // {
+                    task = __mapAttrs (_: task: removeNameAndId task) group.task;
+                  }) job.group;
+                }) jobs;
+          })
+
+          # Remove nulls in the merge function for brevity.
+          (t: t // {
+            merge = loc: defs:
+              lib.filterAttrsRecursive
+                (_: v: v != null)
+                (t.merge loc defs);
+          })
+        ];
+    };
+  };
 in {
   options = {
     action = mkOption {
       default = {};
       type = attrsOf actionType;
-      description = ''
-        A Cicero action
-      '';
+      description = "Cicero actions.";
     };
 
     job = mkOption {
       default = {};
       type = attrsOf jobType;
-      description = ''
-        A Nomad job
-      '';
+      description = "A nomad job.".
     };
 
     task = mkOption {
       default = {};
       type = attrsOf taskType;
-      description = ''
-        A Tullia task
-      '';
+      description = "Tullia tasks.";
     };
 
     wrappedTask = mkOption {
       default = {};
       type = attrsOf taskType;
       description = ''
-        A Tullia task wrapped in the tullia process to also execute its dependencies.
+        Tullia tasks wrapped in the tullia process to also execute their dependencies.
       '';
     };
 
     dag = mkOption {
       default = {};
       type = attrsOf anything;
-      description = ''
-        Information for the Tullia execution
-      '';
+      description = "Information for the Tullia execution.";
     };
   };
 
   config = let
     enabledTasks = lib.filterAttrs (name: task: task.enable != null && task.enable != false) config.task;
   in {
-    dag = lib.mapAttrs (name: task: task.after) enabledTasks;
+    dag = __mapAttrs (_: task: task.after) enabledTasks;
 
     wrappedTask =
-      lib.mapAttrs (
+      __mapAttrs (
         name: task:
         # these must be removed to be assigned their default value that is based on other options
           removeAttrs task ["computedCommand" "closure"]
@@ -1300,7 +1342,7 @@ in {
             env = {
               RUN_SPEC = __toJSON {
                 inherit (moduleConfig) dag;
-                bin = lib.mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
+                bin = __mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
               };
               MODE = "passthrough";
               RUNTIME = "unwrapped";
