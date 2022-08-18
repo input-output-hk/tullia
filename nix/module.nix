@@ -1313,7 +1313,7 @@ in {
   };
 
   config = let
-    enabledTasks = lib.filterAttrs (name: task: task.enable != null && task.enable != false) config.task;
+    enabledTasks = lib.filterAttrs (name: task: task.enable) config.task;
   in {
     dag = __mapAttrs (_: task: task.after) enabledTasks;
 
