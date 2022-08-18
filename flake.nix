@@ -10,6 +10,7 @@
       inputs = {
         nixpkgs.follows = "nixpkgs";
         nixpkgs-lib.follows = "nixpkgs";
+        flake-utils.follows = "nix2container/flake-utils";
       };
     };
   };
