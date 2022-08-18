@@ -16,6 +16,36 @@
       (__concatStringsSep "-")
     ];
 
+  /*
+    Like `filterAttrs` for values of a module evaluation.
+
+    The predicate function receives the path to the value,
+    its option declaration and the resolved value itself.
+  */
+  filterOptionValues = let
+    recurse = p: pred: options: values:
+      if !__isAttrs values
+      then values
+      else __mapAttrs
+        (k:
+          recurse
+            (p ++ [k])
+            pred
+            (
+              let o = options.${k}; in
+              if lib.isOption options.${k}
+              then options.${k}.type.getSubOptions []
+              else options.${k}
+            )
+        )
+        (
+          lib.filterAttrs
+            (k: pred (p ++ [k]) options.${k})
+            values
+        );
+  in
+    recurse [];
+
   getImageName = image: "${image.imageName}:${image.imageTag}";
 
   moduleConfig = config;
@@ -1320,8 +1350,13 @@ in {
     wrappedTask =
       __mapAttrs (
         name: task:
-        # these must be removed to be assigned their default value that is based on other options
-          removeAttrs task ["computedCommand" "closure"]
+          (
+            # Remove read-only options to avoid an evaluation error.
+            filterOptionValues
+              (path: option: value: !option.readOnly or false)
+              (taskType.getSubOptions [])
+              task
+          )
           // {
             dependencies = [pkgs.tullia];
 
