@@ -5,6 +5,13 @@
     nixpkgs.url = "github:nixos/nixpkgs/nixos-22.05";
     nix2container.url = "github:nlewo/nix2container/init-nix-db";
     std.url = "github:divnix/std";
+    nix-nomad = {
+      url = "github:tristanpemble/nix-nomad";
+      inputs = {
+        nixpkgs.follows = "nixpkgs";
+        nixpkgs-lib.follows = "nixpkgs";
+      };
+    };
   };
 
   outputs = inputs: let

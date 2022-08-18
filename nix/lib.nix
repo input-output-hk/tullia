@@ -19,6 +19,10 @@ inputs: let
     }:
       (evalModules
         {
+          specialArgs = {
+            inherit (pkgs) lib;
+          };
+
           modules = [
             ./module.nix
             {
@@ -48,6 +52,10 @@ inputs: let
     pkgs = augmentPkgs system;
   in
     (evalModules {
+      specialArgs = {
+        inherit (pkgs) lib;
+      };
+
       modules = [
         ./module.nix
         {

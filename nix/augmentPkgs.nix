@@ -1,5 +1,5 @@
 inputs: system: (let
-  pkgs = inputs.nixpkgs.legacyPackages.${system};
+  pkgs = inputs.nixpkgs.legacyPackages.${system}.extend inputs.nix-nomad.overlays.default;
   tullia = inputs.self.defaultPackage.${system};
   inherit (inputs.nix2container.packages.${system}.nix2container) buildImage buildLayer;
   inherit (pkgs.lib) fileContents splitString;
@@ -21,4 +21,7 @@ inputs: system: (let
     storePaths = splitString "\n" content;
   };
 in
-  pkgs // {inherit tullia buildImage buildLayer getClosure;})
+  pkgs // {
+    inherit tullia buildImage buildLayer getClosure;
+    inherit (inputs) nix-nomad;
+  })

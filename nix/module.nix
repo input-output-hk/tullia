@@ -7,7 +7,7 @@
   ...
 }: let
   inherit (lib) mkOption;
-  inherit (lib.types) attrsOf submodule attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path;
+  inherit (lib.types) attrsOf submodule attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path addCheck;
 
   sanitizeServiceName = name:
     lib.pipe name [
@@ -100,127 +100,6 @@
     writers.shell {
       inherit name;
       text = commandsWrapped;
-    };
-
-  taskNomadType = task:
-    submodule {
-      options = {
-        driver = mkOption {
-          type = enum ["exec" "nix" "docker" "podman" "java"];
-          default = "podman";
-        };
-
-        config = mkOption {
-          type = attrsOf anything;
-          default = {};
-        };
-
-        env = mkOption {
-          type = attrsOf str;
-          default = {};
-        };
-
-        resources = mkOption {
-          default = {};
-          type = submodule {
-            options = {
-              cpu = mkOption {
-                type = ints.positive;
-                default = 100;
-              };
-
-              memory = mkOption {
-                type = ints.positive;
-                default = task.memory;
-              };
-
-              cores = mkOption {
-                type = nullOr ints.positive;
-                default = null;
-              };
-            };
-          };
-        };
-
-        template = mkOption {
-          default = [];
-          apply = lib.unique;
-          type = listOf (submodule {
-            options = let
-              duration = strMatching "([[:digit:]]+(y|w|d|h|m|s|ms)){0,7}";
-            in {
-              destination = mkOption {
-                type = str;
-              };
-
-              data = mkOption {
-                type = lines;
-                default = "";
-              };
-
-              change_mode = mkOption {
-                default = "restart";
-                type = enum ["noop" "restart" "signal"];
-              };
-
-              change_signal = mkOption {
-                default = "";
-                type = str;
-              };
-
-              perms = mkOption {
-                type = strMatching "[[:digit:]]{3,4}";
-                default = "644";
-              };
-
-              env = mkOption {
-                type = bool;
-                default = false;
-              };
-
-              left_delimiter = mkOption {
-                type = str;
-                default = "{{";
-              };
-
-              right_delimiter = mkOption {
-                type = str;
-                default = "}}";
-              };
-
-              source = mkOption {
-                type = str;
-                default = "";
-              };
-
-              splay = mkOption {
-                type = duration;
-                default = "5s";
-              };
-            };
-          });
-        };
-
-        meta = mkOption {
-          type = attrsOf str;
-          default = {};
-        };
-
-        service = mkOption {
-          type = attrsOf anything;
-          default = {};
-        };
-      };
-
-      config = {
-        # NOTE: there has to be a better way to get the original value before `apply` ran?
-        inherit (task.oci) env;
-
-        config =
-          if task.nomad.driver == "podman"
-          then {image = lib.mkDefault (task.oci.image // {__toString = _: getImageName task.oci.image;});}
-          else throw "Driver '${task.nomad.driver}' not supported yet";
-      };
     };
 
   commandType = task:
@@ -769,7 +648,38 @@
 
       nomad = mkOption {
         default = {};
-        type = taskNomadType config;
+        type = nomadTypes.Task.substSubModules [(
+          {name, ...} @ args: let
+            originalSubModule =
+              assert __length nomadTypes.Task.getSubModules == 1;
+              lib.head nomadTypes.Task.getSubModules;
+            o = originalSubModule args;
+          in o // {
+            options = o.options // {
+              driver = o.options.driver // {
+                default = "podman";
+              };
+            };
+
+            config = {
+              env = __mapAttrs (_: lib.mkDefault) task.env;
+
+              resources = {
+                cpu = lib.mkDefault 100;
+                memory = lib.mkDefault task.memory;
+              };
+
+              config = lib.mkIf (args.config.driver != null) (
+                {
+                  podman.image = lib.mkDefault (
+                    task.oci.image //
+                    {__toString = getImageName;}
+                  );
+                }.${args.config.driver} or (throw "Driver '${args.config.driver}' not supported yet")
+              );
+            };
+          }
+        )];
       };
 
       podman = mkOption {
@@ -1115,63 +1025,6 @@
     config.commands = [(task.command // {main = true;})];
   });
 
-  jobType = submodule {
-    options = {
-      namespace = mkOption {
-        type = str;
-        default = "default";
-        description = ''
-          Namespace the Nomad job should run in.
-        '';
-      };
-
-      datacenters = mkOption {
-        type = listOf str;
-        default = ["dc1"];
-        description = ''
-          Which datacenters the Nomad job should be scheduled in.
-        '';
-      };
-
-      type = mkOption {
-        type = enum ["batch" "service" "batch" "sysbatch"];
-        default = "batch";
-        description = ''
-          The Nomad job type
-        '';
-      };
-
-      group = mkOption {
-        default = {};
-        description = ''
-          The Nomad Task Group
-        '';
-        type = attrsOf (submodule {
-          options = {
-            reschedule = mkOption {
-              type = attrsOf anything;
-              default = {};
-              description = "Nomad reschedule stanza";
-            };
-
-            restart = mkOption {
-              type = attrsOf anything;
-              default = {};
-              description = "Nomad restart stanza";
-            };
-
-            task = mkOption {
-              default = {};
-              type = attrsOf taskType;
-              apply = lib.mapAttrs (name: value: value.nomad or value);
-              description = "Nomad job stanza";
-            };
-          };
-        });
-      };
-    };
-  };
-
   actionType = submodule ({
     name,
     config,
@@ -1208,7 +1061,7 @@
       };
 
       job = mkOption {
-        type = attrsOf jobType;
+        type = nomadTypes.Job;
         default = {};
         description = ''
           The Nomad job generated from the task.
@@ -1393,27 +1246,19 @@ in {
             nomad =
               task.nomad
               // {
-                config = removeAttrs task.nomad.config [
+                ${if task.nomad ? config then "config" else null} = removeAttrs task.nomad.config [
                   # must be removed to build a new image for the wrapper through the default value
                   "image"
                 ];
 
                 # propagate max dependencies' resources up to wrapper job
                 resources = lib.pipe task.after [
-                  (map (name: moduleConfig.wrappedTask.${name}.nomad.resources))
-                  (xs: xs ++ [task.nomad.resources])
-                  (
-                    lib.foldAttrs (
-                      a: b:
-                        if __elem null [a b]
-                        then
-                          if a == null
-                          then b
-                          else a
-                        else lib.max a b
-                    )
-                    null
-                  )
+                  (map (name: moduleConfig.wrappedTask.${name}.nomad.resources or null))
+                  (xs: xs ++ [(task.nomad.resources or null)])
+                  (__filter (x: x != null))
+                  (map (lib.filterAttrs (_: v: v != null)))
+                  (lib.foldAttrs lib.max 0)
+                  (rs: if rs != {} then rs else null)
                 ];
               };
           }
