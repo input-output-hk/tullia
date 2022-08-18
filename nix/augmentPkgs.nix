@@ -21,7 +21,8 @@ inputs: system: (let
     storePaths = splitString "\n" content;
   };
 in
-  pkgs // {
+  pkgs
+  // {
     inherit tullia buildImage buildLayer getClosure;
     inherit (inputs) nix-nomad;
   })

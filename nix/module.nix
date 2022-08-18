@@ -17,31 +17,35 @@
     ];
 
   /*
-    Like `filterAttrs` for values of a module evaluation.
-
-    The predicate function receives the path to the value,
-    its option declaration and the resolved value itself.
-  */
+   Like `filterAttrs` for values of a module evaluation.
+   
+   The predicate function receives the path to the value,
+   its option declaration and the resolved value itself.
+   */
   filterOptionValues = let
     recurse = p: pred: options: values:
       if !__isAttrs values
       then values
-      else __mapAttrs
-        (k:
-          recurse
+      else
+        __mapAttrs
+        (
+          k:
+            recurse
             (p ++ [k])
             pred
             (
-              let o = options.${k}; in
-              if lib.isOption options.${k}
-              then options.${k}.type.getSubOptions []
-              else options.${k}
+              let
+                o = options.${k};
+              in
+                if lib.isOption options.${k}
+                then options.${k}.type.getSubOptions []
+                else options.${k}
             )
         )
         (
           lib.filterAttrs
-            (k: pred (p ++ [k]) options.${k})
-            values
+          (k: pred (p ++ [k]) options.${k})
+          values
         );
   in
     recurse [];
@@ -648,38 +652,47 @@
 
       nomad = mkOption {
         default = {};
-        type = nomadTypes.Task.substSubModules [(
-          {name, ...} @ args: let
-            originalSubModule =
-              assert __length nomadTypes.Task.getSubModules == 1;
-              lib.head nomadTypes.Task.getSubModules;
-            o = originalSubModule args;
-          in o // {
-            options = o.options // {
-              driver = o.options.driver // {
-                default = "podman";
-              };
-            };
+        type = nomadTypes.Task.substSubModules [
+          (
+            {name, ...} @ args: let
+              originalSubModule = assert __length nomadTypes.Task.getSubModules == 1;
+                lib.head nomadTypes.Task.getSubModules;
+              o = originalSubModule args;
+            in
+              o
+              // {
+                options =
+                  o.options
+                  // {
+                    driver =
+                      o.options.driver
+                      // {
+                        default = "podman";
+                      };
+                  };
 
-            config = {
-              env = __mapAttrs (_: lib.mkDefault) task.env;
+                config = {
+                  env = __mapAttrs (_: lib.mkDefault) task.env;
 
-              resources = {
-                cpu = lib.mkDefault 100;
-                memory = lib.mkDefault task.memory;
-              };
+                  resources = {
+                    cpu = lib.mkDefault 100;
+                    memory = lib.mkDefault task.memory;
+                  };
 
-              config = lib.mkIf (args.config.driver != null) (
-                {
-                  podman.image = lib.mkDefault (
-                    task.oci.image //
-                    {__toString = getImageName;}
+                  config = lib.mkIf (args.config.driver != null) (
+                    {
+                      podman.image = lib.mkDefault (
+                        task.oci.image
+                        // {__toString = getImageName;}
+                      );
+                    }
+                    .${args.config.driver}
+                    or (throw "Driver '${args.config.driver}' not supported yet")
                   );
-                }.${args.config.driver} or (throw "Driver '${args.config.driver}' not supported yet")
-              );
-            };
-          }
-        )];
+                };
+              }
+          )
+        ];
       };
 
       podman = mkOption {
@@ -1119,53 +1132,69 @@
   });
 
   nomadTypes = let
-    original = (lib.evalModules {
-      modules = map (m: "${pkgs.nix-nomad}/modules/${m}.nix") [
-        "lib"
-        "generated"
-      ];
-    })._module.types;
-  in original // {
-    # We cannot directly modify the type because
-    # `fixupOptionType` from `nixpkgs/lib/modules.nix`
-    # never looks at it. Instead it only evaluates
-    # `substSubModules` so we have to sneak in there.
-    # TODO Looks like a general problem with the `submodule` type. Fix upstream?
-    Job = let
-      outer = attrsOf original.Job;
-    in outer // {
-      substSubModules = m:
-        lib.pipe outer [
-          (t: t.substSubModules m)
-
-          (t: addCheck t (jobs: __length (__attrNames jobs) <= 1))
-
-          # Remove the `name` and `id` options in the merge function.
-          # Would be great if we could simply remove these options
-          # from the submodule altogether but that seems much more tedious.
-          (t: t // {
-            merge = loc: defs:
-              let
-                jobs = t.merge loc defs;
-                removeNameAndId = lib.flip removeAttrs ["name" "id"];
-              in
-                __mapAttrs (_: job: (removeNameAndId job) // {
-                  group = __mapAttrs (_: group: (removeNameAndId group) // {
-                    task = __mapAttrs (_: task: removeNameAndId task) group.task;
-                  }) job.group;
-                }) jobs;
-          })
-
-          # Remove nulls in the merge function for brevity.
-          (t: t // {
-            merge = loc: defs:
-              lib.filterAttrsRecursive
-                (_: v: v != null)
-                (t.merge loc defs);
-          })
+    original =
+      (lib.evalModules {
+        modules = map (m: "${pkgs.nix-nomad}/modules/${m}.nix") [
+          "lib"
+          "generated"
         ];
+      })
+      ._module
+      .types;
+  in
+    original
+    // {
+      # We cannot directly modify the type because
+      # `fixupOptionType` from `nixpkgs/lib/modules.nix`
+      # never looks at it. Instead it only evaluates
+      # `substSubModules` so we have to sneak in there.
+      # TODO Looks like a general problem with the `submodule` type. Fix upstream?
+      Job = let
+        outer = attrsOf original.Job;
+      in
+        outer
+        // {
+          substSubModules = m:
+            lib.pipe outer [
+              (t: t.substSubModules m)
+
+              (t: addCheck t (jobs: __length (__attrNames jobs) <= 1))
+
+              # Remove the `name` and `id` options in the merge function.
+              # Would be great if we could simply remove these options
+              # from the submodule altogether but that seems much more tedious.
+              (t:
+                t
+                // {
+                  merge = loc: defs: let
+                    jobs = t.merge loc defs;
+                    removeNameAndId = lib.flip removeAttrs ["name" "id"];
+                  in
+                    __mapAttrs (_: job:
+                      (removeNameAndId job)
+                      // {
+                        group = __mapAttrs (_: group:
+                          (removeNameAndId group)
+                          // {
+                            task = __mapAttrs (_: task: removeNameAndId task) group.task;
+                          })
+                        job.group;
+                      })
+                    jobs;
+                })
+
+              # Remove nulls in the merge function for brevity.
+              (t:
+                t
+                // {
+                  merge = loc: defs:
+                    lib.filterAttrsRecursive
+                    (_: v: v != null)
+                    (t.merge loc defs);
+                })
+            ];
+        };
     };
-  };
 in {
   options = {
     action = mkOption {
@@ -1206,9 +1235,9 @@ in {
           (
             # Remove read-only options to avoid an evaluation error.
             filterOptionValues
-              (path: option: value: !option.readOnly or false)
-              (taskType.getSubOptions [])
-              task
+            (path: option: value: !option.readOnly or false)
+            (taskType.getSubOptions [])
+            task
           )
           // {
             dependencies = [pkgs.tullia];
@@ -1246,7 +1275,11 @@ in {
             nomad =
               task.nomad
               // {
-                ${if task.nomad ? config then "config" else null} = removeAttrs task.nomad.config [
+                ${
+                  if task.nomad ? config
+                  then "config"
+                  else null
+                } = removeAttrs task.nomad.config [
                   # must be removed to build a new image for the wrapper through the default value
                   "image"
                 ];
@@ -1258,7 +1291,12 @@ in {
                   (__filter (x: x != null))
                   (map (lib.filterAttrs (_: v: v != null)))
                   (lib.foldAttrs lib.max 0)
-                  (rs: if rs != {} then rs else null)
+                  (
+                    rs:
+                      if rs != {}
+                      then rs
+                      else null
+                  )
                 ];
               };
           }
