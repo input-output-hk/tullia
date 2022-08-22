@@ -1136,18 +1136,8 @@
     });
   });
 
-  nomadTypes = let
-    original =
-      (lib.evalModules {
-        modules = map (m: "${pkgs.nix-nomad}/modules/${m}.nix") [
-          "lib"
-          "generated"
-        ];
-      })
-      ._module
-      .types;
-  in
-    original
+  nomadTypes =
+    lib.nix-nomad.types
     // {
       # We cannot directly modify the type because
       # `fixupOptionType` from `nixpkgs/lib/modules.nix`
@@ -1155,7 +1145,7 @@
       # `substSubModules` so we have to sneak in there.
       # TODO Looks like a general problem with the `submodule` type. Fix upstream?
       Job = let
-        outer = attrsOf original.Job;
+        outer = attrsOf lib.nix-nomad.types.Job;
       in
         outer
         // {
