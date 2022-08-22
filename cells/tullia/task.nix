@@ -2,7 +2,6 @@
   cell,
   inputs,
 }: let
-  pkgs = inputs.nixpkgs;
   inherit (cell.library) dependencies;
 
   cmd = type: text: {
@@ -13,14 +12,14 @@ in {
 
   goodbye = cmd "elvish" "echo goodbye";
 
-  tidy =
+  tidy = { pkgs, ... }:
     cmd "shell" "go mod tidy -v"
     // {dependencies = with pkgs; [go];};
 
-  fail = {config ? {}, ...}:
+  fail = {config ? {}, lib, ...}:
     cmd "shell" "exit 10"
     // {
-      commands = pkgs.lib.mkAfter [
+      commands = lib.mkAfter [
         {
           text = ''
             echo These should be 10:
@@ -32,7 +31,7 @@ in {
       ];
     };
 
-  doc =
+  doc = {pkgs, ...}:
     cmd "shell" ''
       echo "$PATH" | tr : "\n"
       nix eval --raw .#doc.fine | sponge doc/src/module.md
@@ -44,7 +43,7 @@ in {
       memory = 1000;
     };
 
-  lint =
+  lint = {pkgs, ...}:
     cmd "shell" ''
       echo linting go...
       golangci-lint run
@@ -54,7 +53,7 @@ in {
     ''
     // {dependencies = with pkgs; [golangci-lint go gcc fd alejandra];};
 
-  ci = {config ? {}, ...}:
+  ci = {config ? {}, pkgs, ...}:
     cmd "shell" ''
       echo Fact:
       cat ${pkgs.writeText "fact.json" (builtins.toJSON (config.facts.push or ""))}
@@ -81,7 +80,7 @@ in {
       preset.nix.enable = true;
     };
 
-  build =
+  build = { pkgs, ... }:
     cmd "shell" "go build -o tullia ./cli"
     // {
       after = ["bump"];
