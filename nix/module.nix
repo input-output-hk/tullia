@@ -1155,27 +1155,16 @@
 
               (t: addCheck t (jobs: __length (__attrNames jobs) <= 1))
 
-              # Remove the `name` and `id` options in the merge function.
-              # Would be great if we could simply remove these options
+              # Remove the `id` option in the merge function.
+              # Would be great if we could simply remove the option
               # from the submodule altogether but that seems much more tedious.
               (t:
                 t
                 // {
-                  merge = loc: defs: let
-                    jobs = t.merge loc defs;
-                    removeNameAndId = lib.flip removeAttrs ["name" "id"];
-                  in
-                    __mapAttrs (_: job:
-                      (removeNameAndId job)
-                      // {
-                        group = __mapAttrs (_: group:
-                          (removeNameAndId group)
-                          // {
-                            task = __mapAttrs (_: task: removeNameAndId task) group.task;
-                          })
-                        job.group;
-                      })
-                    jobs;
+                  merge = loc: defs:
+                    __mapAttrs
+                    (_: job: removeAttrs job ["id"])
+                    (t.merge loc defs);
                 })
 
               # Remove nulls in the merge function for brevity.

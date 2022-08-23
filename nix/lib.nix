@@ -16,8 +16,8 @@ inputs: let
       inputs,
       ociRegistry,
       rootDir ? null,
-    }:
-      (evalModules
+    }: let
+      inherit (evalModules
         {
           specialArgs = {
             inherit (pkgs) lib;
@@ -42,8 +42,16 @@ inputs: let
                 tasks;
             }
           ];
-        })
-      .config;
+        }) config;
+    in config // {
+      action = __mapAttrs (k: v: v // {
+        # Convert the attrset of jobs (must be only one)
+        # to an API JSON job definition.
+        job = 
+          pkgs.lib.nix-nomad.transformers.Job.toJSON
+          (pkgs.lib.last (__attrValues v.job));
+      }) config.action;
+    };
 
   evalTask = {
     tasks,
