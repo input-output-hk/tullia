@@ -17,41 +17,49 @@ inputs: let
       ociRegistry,
       rootDir ? null,
     }: let
-      inherit (evalModules
-        {
-          specialArgs = {
-            inherit (pkgs) lib;
-          };
+      inherit
+        (evalModules
+          {
+            specialArgs = {
+              inherit (pkgs) lib;
+            };
 
-          modules = [
-            ./module.nix
-            {
-              _file = ./lib.nix;
-              _module.args = {inherit pkgs rootDir ociRegistry;};
-              inherit action;
-              task = tasks;
-            }
-            {
-              task =
-                mapAttrs (n: v: {
-                  action = {
-                    inherit name id;
-                    facts = inputs;
-                  };
-                })
-                tasks;
-            }
-          ];
-        }) config;
-    in config // {
-      action = __mapAttrs (k: v: v // {
-        # Convert the attrset of jobs (must be only one)
-        # to an API JSON job definition.
-        job = 
-          pkgs.lib.nix-nomad.transformers.Job.toJSON
-          (pkgs.lib.last (__attrValues v.job));
-      }) config.action;
-    };
+            modules = [
+              ./module.nix
+              {
+                _file = ./lib.nix;
+                _module.args = {inherit pkgs rootDir ociRegistry;};
+                inherit action;
+                task = tasks;
+              }
+              {
+                task =
+                  mapAttrs (n: v: {
+                    action = {
+                      inherit name id;
+                      facts = inputs;
+                    };
+                  })
+                  tasks;
+              }
+            ];
+          })
+        config
+        ;
+    in
+      config
+      // {
+        action = __mapAttrs (k: v:
+          v
+          // {
+            # Convert the attrset of jobs (must be only one)
+            # to an API JSON job definition.
+            job =
+              pkgs.lib.nix-nomad.transformers.Job.toJSON
+              (pkgs.lib.last (__attrValues v.job));
+          })
+        config.action;
+      };
 
   evalTask = {
     tasks,

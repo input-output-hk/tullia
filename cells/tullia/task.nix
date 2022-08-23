@@ -12,11 +12,15 @@ in {
 
   goodbye = cmd "elvish" "echo goodbye";
 
-  tidy = { pkgs, ... }:
+  tidy = {pkgs, ...}:
     cmd "shell" "go mod tidy -v"
     // {dependencies = with pkgs; [go];};
 
-  fail = {config ? {}, lib, ...}:
+  fail = {
+    config ? {},
+    lib,
+    ...
+  }:
     cmd "shell" "exit 10"
     // {
       commands = lib.mkAfter [
@@ -53,7 +57,11 @@ in {
     ''
     // {dependencies = with pkgs; [golangci-lint go gcc fd alejandra];};
 
-  ci = {config ? {}, pkgs, ...}:
+  ci = {
+    config ? {},
+    pkgs,
+    ...
+  }:
     cmd "shell" ''
       echo Fact:
       cat ${pkgs.writeText "fact.json" (builtins.toJSON (config.facts.push or ""))}
@@ -80,7 +88,7 @@ in {
       preset.nix.enable = true;
     };
 
-  build = { pkgs, ... }:
+  build = {pkgs, ...}:
     cmd "shell" "go build -o tullia ./cli"
     // {
       after = ["bump"];

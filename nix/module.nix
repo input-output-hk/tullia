@@ -11,13 +11,16 @@
   inherit (lib.types) attrsOf submoduleWith attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path addCheck;
 
   # Unlike the `submodule` type from nixpkgs this inherits `specialArgs` and `_module.args`.
-  submodule = modules: submoduleWith {
-    inherit specialArgs;
-    shorthandOnlyDefinesConfig = true;
-    modules = lib.toList modules ++ [
-      { _module = { inherit (config._module) args; }; }
-    ];
-  };
+  submodule = modules:
+    submoduleWith {
+      inherit specialArgs;
+      shorthandOnlyDefinesConfig = true;
+      modules =
+        lib.toList modules
+        ++ [
+          {_module = {inherit (config._module) args;};}
+        ];
+    };
 
   sanitizeServiceName = name:
     lib.pipe name [
@@ -175,7 +178,7 @@
     };
   in {
     imports =
-      [ { preset.bash.enable = lib.mkDefault true; } ]
+      [{preset.bash.enable = lib.mkDefault true;}]
       ++ lib.attrValues presets;
 
     options = {
