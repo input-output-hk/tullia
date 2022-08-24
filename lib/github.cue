@@ -87,31 +87,28 @@ import "strings"
 			#default_branch: false
 		}
 
-		inputs: "\(#input)": {
-			value: _
-			match: {
-				github_event: "push"
-				github_body: {
-					deleted: false
-					repository: full_name: #repo
-					head_commit: id:       string
+		inputs: "\(#input)": match: {
+			github_event: "push"
+			github_body: {
+				deleted: false
+				repository: full_name: #repo
+				head_commit: id:       string
 
-					ref: string
-					if #branch != _|_ || #tag != _|_ {
-						ref: or([
-							if #branch != _|_ {
-								=~"^refs/heads/\(#branch)$"
-							},
-							if #tag != _|_ {
-								=~"^refs/tags/\(#tag)$"
-							},
-						])
-					}
+				ref: string
+				if #branch != _|_ || #tag != _|_ {
+					ref: or([
+						if #branch != _|_ {
+							=~"^refs/heads/\(#branch)$"
+						},
+						if #tag != _|_ {
+							=~"^refs/tags/\(#tag)$"
+						},
+					])
+				}
 
-					repository: default_branch: string
-					if #default_branch {
-						ref: "refs/heads/\(repository.default_branch)"
-					}
+				repository: default_branch: string
+				if #default_branch {
+					ref: "refs/heads/\(repository.default_branch)"
 				}
 			}
 		}
