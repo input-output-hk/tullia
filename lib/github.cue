@@ -47,16 +47,16 @@ import "strings"
 		}
 
 		output: {
-			success: ok:        true
-			failure: ok:        false
+			success: ok: true
+			failure: ok: false
 			if _revision != _|_ {
 				[string]: revision: _revision
 			}
 		}
 
 		let body = inputs["\(#input)"].value.github_body
-		_repo: body.repository.full_name
-		_target: body.pull_request.base.ref
+		_repo:           body.repository.full_name
+		_target:         body.pull_request.base.ref
 		_default_branch: body.pull_request.base.ref
 		_revision:       body.pull_request.head.sha
 	}
@@ -114,17 +114,17 @@ import "strings"
 		}
 
 		output: {
-			success: ok:        true
-			failure: ok:        false
+			success: ok: true
+			failure: ok: false
 			if _revision != _|_ {
 				[string]: revision: _revision
 			}
 		}
 
 		let body = inputs["\(#input)"].value.github_body
-		_repo: body.repository.full_name
-		_branch: strings.TrimPrefix(body.ref, "refs/heads/")
-		_tag: strings.TrimPrefix(body.ref, "refs/tags/")
+		_repo:           body.repository.full_name
+		_branch:         strings.TrimPrefix(body.ref, "refs/heads/")
+		_tag:            strings.TrimPrefix(body.ref, "refs/tags/")
 		_default_branch: body.repository.default_branch
 		_revision:       body.head_commit.id
 	}
