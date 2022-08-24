@@ -3,7 +3,8 @@
 	#repo:  "input-output-hk/tullia"
 }
 
-#lib: ios: [
-	{#lib.io.github_pr, github},
-	{#lib.io.github_push, github},
+#lib.merge
+#ios: [
+	#lib.io.github_pr & github,
+	#lib.io.github_push & github,
 ]

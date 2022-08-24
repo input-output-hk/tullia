@@ -25,28 +25,30 @@ output?: #output
 
 	io: [string]: _#io
 
-	ios: [..._#io]
-}
+	merge: {
+		#ios: [..._#io]
 
-for io in #lib.ios {
-	for k, v in io.inputs {
-		inputs: "\(k)": {
-			match: or([ for io2 in #lib.ios {io2.inputs[k].match}])
+		for io in #ios {
+			for k, v in io.inputs {
+				inputs: "\(k)": {
+					match: or([ for io2 in #ios {io2.inputs[k].match}])
 
-			if v.not != _|_ {
-				not: v.not
+					if v.not != _|_ {
+						not: v.not
+					}
+
+					if v.optional != _|_ {
+						optional: v.optional
+					}
+				}
 			}
 
-			if v.optional != _|_ {
-				optional: v.optional
-			}
+			output: {
+				io
+				inputs: _final_inputs
+			}.output
 		}
 	}
-
-	output: {
-		io
-		inputs: _final_inputs
-	}.output
 }
 
 // XXX Why does a let declaration not work here?
