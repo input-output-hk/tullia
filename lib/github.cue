@@ -1,3 +1,5 @@
+import "strings"
+
 #lib: io: {
 	github_pr: {
 		#input: {
@@ -31,14 +33,14 @@
 
 				pull_request: {
 					if #target != _|_ {
-						base: ref: #target
+						base: ref: =~#target
 					}
 
 					head: sha: string
 				}
 
+				pull_request: base: ref: repository.default_branch
 				if #target_default {
-					pull_request: base: ref: repository.default_branch
 					repository: default_branch: string
 				}
 			}
@@ -47,13 +49,14 @@
 		output: {
 			success: ok: true
 			failure: ok: false
-
-			#revision: bool | *true
-			let revision_ = inputs["\(#input)"].value.github_body.pull_request.head.sha
-			if #revision && revision_ != _|_ {
-				[string]: revision: revision_
-			}
+			[string]: revision: _revision
 		}
+
+		let body = inputs["\(#input)"].value.github_body
+		_repo: body.repository.full_name
+		_target: body.pull_request.base.ref
+		_default_branch: body.pull_request.base.ref
+		_revision: body.pull_request.head.sha
 	}
 
 	github_push: {
@@ -82,28 +85,31 @@
 			#default_branch: false
 		}
 
-		inputs: "\(#input)": match: {
-			github_event: "push"
-			github_body: {
-				deleted: false
-				repository: full_name: #repo
-				head_commit: id:       string
+		inputs: "\(#input)": {
+			value: _
+			match: {
+				github_event: "push"
+				github_body: {
+					deleted: false
+					repository: full_name: #repo
+					head_commit: id:       string
 
-				ref: string
-				if #branch != _|_ || #tag != _|_ {
-					ref: or([
-						if #branch != _|_ {
-							=~"^refs/heads/\(#branch)$"
-						},
-						if #tag != _|_ {
-							=~"^refs/tags/\(#tag)$"
-						},
-					])
-				}
+					ref: string
+					if #branch != _|_ || #tag != _|_ {
+						ref: or([
+							if #branch != _|_ {
+								=~"^refs/heads/\(#branch)$"
+							},
+							if #tag != _|_ {
+								=~"^refs/tags/\(#tag)$"
+							},
+						])
+					}
 
-				if #default_branch {
-					ref: "refs/heads/\(repository.default_branch)"
 					repository: default_branch: string
+					if #default_branch {
+						ref: "refs/heads/\(repository.default_branch)"
+					}
 				}
 			}
 		}
@@ -111,12 +117,14 @@
 		output: {
 			success: ok: true
 			failure: ok: false
-
-			#revision: bool | *true
-			let revision_ = inputs["\(#input)"].value.github_body.head_commit.id
-			if #revision && revision_ != _|_ {
-				[string]: revision: revision_
-			}
+			[string]: revision: _revision
 		}
+
+		let body = inputs["\(#input)"].value.github_body
+		_repo: body.repository.full_name
+		_branch: strings.TrimPrefix(body.ref, "refs/heads/")
+		_tag: strings.TrimPrefix(body.ref, "refs/tags/")
+		_default_branch: body.repository.default_branch
+		_revision: body.head_commit.id
 	}
 }
