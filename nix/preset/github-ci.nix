@@ -183,7 +183,7 @@ in {
         (lib.mkOrder 1600 [reportStatus])
       ];
 
-      nomad.template = [
+      nomad.templates = [
         {
           destination = "/secrets/cicero/github/token";
           data = ''{{with secret "kv/data/cicero/github"}}{{.Data.data.token}}{{end}}'';
