@@ -1179,6 +1179,38 @@
                     (_: v: v != null)
                     (t.merge loc defs);
                 })
+
+              # Make sure templates are unique because Nomad
+              # does not like two templates with the same destination.
+              # This could happen, for instance, if the same preset
+              # is enabled in a task and one of its dependency tasks,
+              # adding the same template twice.
+              (t:
+                t
+                // {
+                  merge = loc: defs:
+                    __mapAttrs
+                    (_: job:
+                      job
+                      // {
+                        group =
+                          __mapAttrs
+                          (_: group:
+                            group
+                            // {
+                              task =
+                                __mapAttrs
+                                (_: task:
+                                  task
+                                  // lib.optionalAttrs (task ? templates) {
+                                    templates = lib.unique task.templates;
+                                  })
+                                group.task;
+                            })
+                          job.group;
+                      })
+                    (t.merge loc defs);
+                })
             ];
         };
     };
