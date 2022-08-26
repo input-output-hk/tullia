@@ -50,12 +50,24 @@
         type = "shell";
         runtimeInputs = [pkgs.nix];
         text = ''
-          if [[ -s /registration ]]; then
-            if command -v nix-store >/dev/null; then
-              echo populating nix store...
-              nix-store --load-db < /registration
-            fi
+          if [[ ! -s /registration ]]; then
+            exit 0
           fi
+
+          if command -v nix-store >/dev/null; then
+            echo populating nix store...
+            nix-store --load-db < /registration
+          fi
+
+          # Make sure permissions are open enough.
+          # On certain runtimes like containers
+          # this may be a volume that is created
+          # with the host's umask, thereby possibly
+          # having too strict permission bits set.
+          # In that case, since the volume mount
+          # shadows the container's contents,
+          # permissions in the image are never used.
+          chmod 1777 /tmp
         '';
       }
     ];
