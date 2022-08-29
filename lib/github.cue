@@ -57,7 +57,7 @@ import "strings"
 		let body = inputs["\(#input)"].value.github_body
 		_repo:           body.repository.full_name
 		_target:         body.pull_request.base.ref
-		_default_branch: body.pull_request.base.ref
+		_default_branch: body.repository.default_branch
 		_revision:       body.pull_request.head.sha
 	}
 
