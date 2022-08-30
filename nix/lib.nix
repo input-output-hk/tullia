@@ -7,7 +7,7 @@ inputs: let
   evalAction = {
     tasks,
     rootDir ? null,
-  }: system: action: let
+  }: system: actions: let
     pkgs = augmentPkgs system;
   in
     {
@@ -17,6 +17,12 @@ inputs: let
       ociRegistry,
       rootDir ? null,
     }: let
+      run = {
+        action = name;
+        run = id;
+        facts = inputs;
+      };
+
       inherit
         (evalModules
           {
@@ -29,17 +35,18 @@ inputs: let
               {
                 _file = ./lib.nix;
                 _module.args = {inherit pkgs rootDir ociRegistry;};
-                inherit action;
+                action = actions;
                 task = tasks;
               }
               {
+                action =
+                  mapAttrs
+                  (_: _: {inherit run;})
+                  actions;
+
                 task =
-                  mapAttrs (n: v: {
-                    action = {
-                      inherit name id;
-                      facts = inputs;
-                    };
-                  })
+                  mapAttrs
+                  (_: _: {actionRun = run;})
                   tasks;
               }
             ];

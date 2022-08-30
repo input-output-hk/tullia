@@ -32,7 +32,7 @@ in {
       readOnly = true;
       type = with types; attrsOf unspecified;
       default.getRevision = fact: default: let
-        inherit (config.action.facts.${fact}.value) github_body;
+        inherit (config.actionRun.facts.${fact}.value) github_body;
       in
         github_body.pull_request.head.sha
         or github_body.head_commit.id
@@ -99,7 +99,7 @@ in {
           fi
 
           local context=${
-          lib.pipe config.action.name or null [
+          lib.pipe config.actionRun.action or null [
             (
               c:
                 if c == null

@@ -192,78 +192,12 @@
         '';
       };
 
-      action = mkOption {
+      actionRun = mkOption {
         default = {};
         description = ''
           Information provided by Cicero while executing an action.
         '';
-        type = submodule {
-          options = {
-            name = mkOption {
-              type = str;
-              default = "";
-              description = ''
-                Name of the Cicero action
-              '';
-            };
-
-            id = mkOption {
-              type = str;
-              default = "";
-              description = ''
-                ID of the Cicero run
-              '';
-            };
-
-            facts = mkOption {
-              default = {};
-              description = ''
-                Facts that matched the io.
-              '';
-              type = attrsOf (submodule (
-                {name, ...}: {
-                  options = {
-                    name = mkOption {
-                      type = str;
-                      default = name;
-                      description = ''
-                        Name of the fact
-                      '';
-                    };
-
-                    id = mkOption {
-                      type = str;
-                      description = ''
-                        ID of the fact
-                      '';
-                    };
-
-                    created_at = mkOption {
-                      type = str;
-                      description = ''
-                        Date and time the fact was created
-                      '';
-                    };
-
-                    binary_hash = mkOption {
-                      type = str;
-                      description = ''
-                        Binary hash of the fact
-                      '';
-                    };
-
-                    value = mkOption {
-                      type = attrsOf anything;
-                      description = ''
-                        Value of the fact
-                      '';
-                    };
-                  };
-                }
-              ));
-            };
-          };
-        };
+        type = runType;
       };
 
       command = mkOption {
@@ -1129,6 +1063,14 @@
           like pushing the OCI image the job references.
         '';
       };
+
+      run = mkOption {
+        type = runType;
+        default = {};
+        description = ''
+          Information provided by Cicero while executing an action.
+        '';
+      };
     };
 
     config = lib.mkIf (action.task != null) (let
@@ -1138,6 +1080,74 @@
       job.${sname}.group.tullia.task.tullia = t.nomad or t;
     });
   });
+
+  runType = submodule {
+    options = {
+      action = mkOption {
+        type = str;
+        default = "";
+        description = ''
+          Name of the Cicero action
+        '';
+      };
+
+      run = mkOption {
+        type = str;
+        default = "";
+        description = ''
+          ID of the Cicero run
+        '';
+      };
+
+      facts = mkOption {
+        default = {};
+        description = ''
+          Facts that matched the io.
+        '';
+        type = attrsOf (submodule (
+          {name, ...}: {
+            options = {
+              name = mkOption {
+                type = str;
+                default = name;
+                description = ''
+                  Name of the fact
+                '';
+              };
+
+              id = mkOption {
+                type = str;
+                description = ''
+                  ID of the fact
+                '';
+              };
+
+              created_at = mkOption {
+                type = str;
+                description = ''
+                  Date and time the fact was created
+                '';
+              };
+
+              binary_hash = mkOption {
+                type = str;
+                description = ''
+                  Binary hash of the fact
+                '';
+              };
+
+              value = mkOption {
+                type = attrsOf anything;
+                description = ''
+                  Value of the fact
+                '';
+              };
+            };
+          }
+        ));
+      };
+    };
+  };
 
   nomadTypes =
     lib.nix-nomad.types
