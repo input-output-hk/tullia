@@ -1122,6 +1122,14 @@
                 '';
               };
 
+              run_id = mkOption {
+                type = nullOr str;
+                default = null;
+                description = ''
+                  ID of the run that created the fact
+                '';
+              };
+
               created_at = mkOption {
                 type = str;
                 description = ''
