@@ -1130,7 +1130,8 @@
               };
 
               binary_hash = mkOption {
-                type = str;
+                type = nullOr str;
+                default = null;
                 description = ''
                   Binary hash of the fact
                 '';
