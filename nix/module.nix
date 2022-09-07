@@ -1177,18 +1177,6 @@
 
               (t: addCheck t (jobs: __length (__attrNames jobs) <= 1))
 
-              # Remove the `id` option in the merge function.
-              # Would be great if we could simply remove the option
-              # from the submodule altogether but that seems much more tedious.
-              (t:
-                t
-                // {
-                  merge = loc: defs:
-                    __mapAttrs
-                    (_: job: removeAttrs job ["id"])
-                    (t.merge loc defs);
-                })
-
               # Remove nulls in the merge function for brevity.
               (t:
                 t
