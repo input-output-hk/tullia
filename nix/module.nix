@@ -1041,7 +1041,7 @@
                   groupName: group:
                     lib.mapAttrsToList (
                       taskName: task:
-                        if task.config ? image
+                        if task.config ? image && lib.isDerivation task.config.image
                         then {
                           type = "nix2container";
                           name = getImageName task.config.image;
