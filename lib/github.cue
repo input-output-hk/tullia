@@ -16,7 +16,7 @@ import "strings"
 			}
 		}.result
 
-		#repo:           =~"^[^/]+/[^/]+$"
+		#repo:           =~"^[^/]+/[^/]+(//[^/]+)?$"
 		#target?:        string
 		#target_default: bool | *true
 
