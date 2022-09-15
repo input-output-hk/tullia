@@ -25,6 +25,18 @@ in {
       TULLIA_TASK = config.name;
     };
 
+    commands = lib.mkOrder 300 [
+      {
+        type = "shell";
+        text = ''
+          # Set up root user and group.
+          echo >> /etc/passwd 'root:x:0:0:System administrator:/local:/bin/sh'
+          echo >> /etc/shadow 'root:!:1::::::'
+          echo >> /etc/group  'root:x:0:'
+        '';
+      }
+    ];
+
     nsjail = {
       mount."/tmp".options.size = 1024;
       bindmount.rw = lib.mkOrder 300 [

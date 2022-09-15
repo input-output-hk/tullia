@@ -19,17 +19,8 @@
       lib.mkBefore [
         (
           pkgs.runCommand "etc" {} ''
-            mkdir -p $out/etc
-            cd $out/etc
-
-            echo > passwd 'nixbld1:x:1000:100:Nix build user 1:/local:/bin/sh'
-            echo > shadow 'nixbld1:!:1::::::'
-            echo > group  'nixbld:x:100:nixbld1'
-            echo > subgid 'nixbld1:1000:100'
-            echo > subuid 'nixbld1:1000:100'
-
-            mkdir nix
-            cat <<EOF > nix/nix.conf
+            mkdir -p $out/etc/nix
+            cat <<EOF > $out/etc/nix/nix.conf
             experimental-features = ca-derivations flakes nix-command recursive-nix
             log-lines = 1000
             show-trace = true
@@ -50,6 +41,13 @@
         type = "shell";
         runtimeInputs = [pkgs.nix];
         text = ''
+          # Set up build user and group.
+          echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:/local:/bin/sh'
+          echo >> /etc/shadow 'nixbld1:!:1::::::'
+          echo >> /etc/group  'nixbld:x:100:nixbld1'
+          echo >> /etc/subgid 'nixbld1:1000:100'
+          echo >> /etc/subuid 'nixbld1:1000:100'
+
           if [[ ! -s /registration ]]; then
             exit 0
           fi
