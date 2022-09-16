@@ -650,8 +650,8 @@
                 flags = {
                   v = [
                     ''"$alloc:/alloc"''
-                    ''"$HOME/.netrc:/local/.netrc"''
-                    ''"$HOME/.docker/config.json:/local/.docker/config.json"''
+                    ''"$HOME/.netrc:${task.env.HOME}/.netrc"''
+                    ''"$HOME/.docker/config.json:${task.env.HOME}/.docker/config.json"''
                     ''"$PWD:/repo"''
                   ];
                   rmi = false;
@@ -773,7 +773,7 @@
                     trap finish EXIT
 
                     echo "nixbld:x:$uid:nixbld1" > "$root/etc/group"
-                    echo "nixbld1:x:$uid:$gid:nixbld 1:/local:${pkgs.shadow}/bin/nologin" > "$root/etc/passwd"
+                    echo "nixbld1:x:$uid:$gid:nixbld 1:${task.env.HOME}:${pkgs.shadow}/bin/nologin" > "$root/etc/passwd"
                     echo "nixbld1:$gid:100" > "$root/etc/subgid"
                     echo "nixbld1:$uid:100" > "$root/etc/subuid"
 

@@ -17,7 +17,7 @@ in {
 
     env = {
       CURL_CA_BUNDLE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      HOME = lib.mkDefault "/local";
+      HOME = lib.mkDefault "/local/home";
       NIX_SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       # PATH = lib.makeBinPath config.dependencies;
@@ -30,7 +30,7 @@ in {
         type = "shell";
         text = ''
           # Set up root user and group.
-          echo >> /etc/passwd 'root:x:0:0:System administrator:/local:/bin/sh'
+          echo >> /etc/passwd 'root:x:0:0:System administrator:${config.env.HOME}:/bin/sh'
           echo >> /etc/shadow 'root:!:1::::::'
           echo >> /etc/group  'root:x:0:'
         '';

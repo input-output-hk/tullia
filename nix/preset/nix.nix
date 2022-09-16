@@ -42,7 +42,7 @@
         runtimeInputs = [pkgs.nix];
         text = ''
           # Set up build user and group.
-          echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:/local:/bin/sh'
+          echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:${config.env.HOME}:/bin/sh'
           echo >> /etc/shadow 'nixbld1:!:1::::::'
           echo >> /etc/group  'nixbld:x:100:nixbld1'
           echo >> /etc/subgid 'nixbld1:1000:100'
