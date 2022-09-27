@@ -39,8 +39,8 @@ import "strings"
 					head: sha: string
 				}
 
-				pull_request: base: ref: repository.default_branch
 				if #target_default {
+					pull_request: base: ref: repository.default_branch
 					repository: default_branch: string
 				}
 			}
