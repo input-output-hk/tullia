@@ -23,5 +23,6 @@
     moreutils
     nsjail
     ruby
+    treefmt
   ];
 }
