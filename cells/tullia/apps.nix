@@ -34,6 +34,8 @@
       ];
     };
 in {
+  default = cell.apps.tullia;
+
   tullia = package "sha256-ui9Rjb/1wYUwIkx+lmjONE003ez3kwsUm9xvlmikEkg=";
 
   # Ugly wrapper script for `cue fmt` that adheres to the treefmt spec.

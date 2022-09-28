@@ -35,8 +35,8 @@
     # Soil ...
     # nix-cli compat
     {
-      devShell = inputs.std.harvest inputs.self ["tullia" "devshell" "default"];
-      defaultPackage = inputs.std.harvest inputs.self ["tullia" "apps" "tullia"];
+      devShells = inputs.std.harvest inputs.self ["tullia" "devshell"];
+      packages = inputs.std.harvest inputs.self ["tullia" "apps"];
     }
     # dog food
     (lib.fromStd {
