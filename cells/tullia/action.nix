@@ -1,10 +1,8 @@
 {
   cell,
   inputs,
-}: let
-  pp = cell.library.pp;
-in {
-  ci = {config, ...}: {
+}: {
+  ci = {
     io = ./ci.cue;
     task = "build";
   };
