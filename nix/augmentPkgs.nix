@@ -30,7 +30,7 @@ inputs: system: (let
       })
     ]
   );
-  tullia = inputs.self.defaultPackage.${system};
+  tullia = inputs.self.packages.${system}.default;
   inherit (inputs.nix2container.packages.${system}.nix2container) buildImage buildLayer;
   inherit (pkgs.lib) fileContents splitString;
   getClosure = {

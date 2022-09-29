@@ -6,7 +6,7 @@ require 'date'
 require 'open3'
 require 'English'
 
-pkg = 'path:.#defaultPackage.x86_64-linux'
+pkg = 'path:.#packages.x86_64-linux.default'
 old_sha, version = []
 
 Open3.popen3(

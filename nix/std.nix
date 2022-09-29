@@ -11,7 +11,7 @@ inputs: name: {
     inherit (pkgs) lib;
     fragmentParts = lib.splitString "/" fragmentRelPath;
     taskName = lib.last fragmentParts;
-    tullia = inputs.self.defaultPackage.${system};
+    tullia = inputs.self.packages.${system}.default;
 
     runner = runtime:
       pkgs.writeShellApplication {
