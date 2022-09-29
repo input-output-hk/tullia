@@ -48,16 +48,16 @@
             pred
             (
               let
-                o = options.${k};
+                o = options.${k} or null;
               in
-                if lib.isOption options.${k}
-                then options.${k}.type.getSubOptions []
-                else options.${k}
+                if lib.isOption o
+                then o.type.getSubOptions []
+                else o
             )
         )
         (
           lib.filterAttrs
-          (k: pred (p ++ [k]) options.${k})
+          (k: pred (p ++ [k]) options.${k} or null)
           values
         );
   in
@@ -1261,7 +1261,11 @@ in {
           (
             # Remove read-only options to avoid an evaluation error.
             filterOptionValues
-            (path: option: value: !option.readOnly or false)
+            (path: option: value:
+              if option == null
+              then false
+              else !option.readOnly or false
+            )
             (taskType.getSubOptions [])
             task
           )
