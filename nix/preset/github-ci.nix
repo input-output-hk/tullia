@@ -28,6 +28,8 @@ in {
 
     clone = mkEnableOption "clone the repo" // {default = true;};
 
+    status.enableActionName = mkEnableOption "prefixing the commit status with the action name";
+
     lib = mkOption {
       readOnly = true;
       type = with types; attrsOf unspecified;
@@ -102,9 +104,9 @@ in {
           lib.pipe config.actionRun.action or null [
             (
               c:
-                if c == null
-                then ""
-                else "${c}: "
+                if cfg.status.enableActionName && c != null
+                then "${c}: "
+                else ""
             )
             lib.escapeShellArg
             (c: "${c}\"$TULLIA_TASK\"")
