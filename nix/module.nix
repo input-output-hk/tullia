@@ -1261,10 +1261,11 @@ in {
           (
             # Remove read-only options to avoid an evaluation error.
             filterOptionValues
-            (path: option: value:
-              if option == null
-              then false
-              else !option.readOnly or false
+            (
+              path: option: value:
+                if option == null
+                then false
+                else !option.readOnly or false
             )
             (taskType.getSubOptions [])
             task
