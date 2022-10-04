@@ -26,7 +26,18 @@ in {
       '';
     };
 
-    clone = mkEnableOption "clone the repo" // {default = true;};
+    clone = {
+      enable = mkEnableOption "clone the repo" // {default = true;};
+
+      shallow =
+        mkEnableOption ''
+          shallow clone.
+          This requires Git 2.5.0 on client and server
+          and the server needs to have set `uploadpack.allowReachableSHA1InWant=true`.
+          Supported by GitHub.
+        ''
+        // {default = true;};
+    };
 
     status.enableActionName = mkEnableOption "prefixing the commit status with the action name";
 
@@ -171,13 +182,28 @@ in {
               runtimeInputs = reportStatus.runtimeInputs ++ [pkgs.gitMinimal];
               text =
                 reportStatus.text
-                + lib.optionalString cfg.clone ''
-                  if [[ -z "$(ls -1Aq)" ]]; then
+                + lib.optionalString cfg.clone.enable (
+                  ''
+                    if [[ -n "$(ls -1Aq)" ]]; then
+                      exit 0
+                    fi
                     git='git -c advice.detachedHead=false'
-                    $git clone https://github.com/${lib.escapeShellArg cfg.repo} .
-                    $git checkout ${lib.escapeShellArg cfg.sha}
-                  fi
-                '';
+                    remote=https://github.com/${lib.escapeShellArg cfg.repo}
+                  ''
+                  + (
+                    if cfg.clone.shallow
+                    then ''
+                      $git init --initial-branch=run
+                      $git remote add origin "$remote"
+                      $git fetch --depth 1 origin ${lib.escapeShellArg cfg.sha}
+                      $git checkout FETCH_HEAD
+                    ''
+                    else ''
+                      $git clone $remote .
+                      $git checkout ${lib.escapeShellArg cfg.sha}
+                    ''
+                  )
+                );
             })
         ])
 
