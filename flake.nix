@@ -23,7 +23,7 @@
     inputs.std.growOn {
       inherit inputs;
       cellsFrom = ./cells;
-      organelles = [
+      cellBlocks = [
         (inputs.std.functions "library")
         (inputs.std.devshells "devshell")
         (inputs.std.installables "apps")
