@@ -1,6 +1,6 @@
 inputs: name: {
   inherit name;
-  clade = "tullia";
+  type = "tullia";
   actions = {
     system,
     flake,
