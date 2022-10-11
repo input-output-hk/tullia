@@ -92,10 +92,14 @@
       if command.main
       then ''
         TULLIA_STATUS=0
-        ${makeCommand command}/bin/${name} || TULLIA_STATUS="$?"
+        #shellcheck disable=SC2288
+        ${makeCommand command}/bin/${lib.escapeShellArg name} || TULLIA_STATUS="$?"
         export TULLIA_STATUS
       ''
-      else "${makeCommand command}/bin/${name}";
+      else ''
+        #shellcheck disable=SC2288
+        ${makeCommand command}/bin/${lib.escapeShellArg name}
+      '';
 
     commandsWrapped = ''
       ${lib.concatMapStringsSep "\n" mapCommand (
@@ -782,7 +786,7 @@
                       --group "$gid" \
                       ''${cgroupV2Mount:+--use_cgroupv2} \
                       ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${config.name}"}
+                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${lib.escapeShellArg config.name}"}
                   '';
                 };
             };
@@ -968,7 +972,8 @@
                 runtimeInputs = task.dependencies;
                 text = ''
                   ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
-                  exec ${task.computedCommand}/bin/${task.name}
+                  #shellcheck disable=SC2288
+                  exec ${task.computedCommand}/bin/${lib.escapeShellArg task.name}
                 '';
               };
             };
