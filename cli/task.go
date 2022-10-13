@@ -242,13 +242,41 @@ func (t *Task) fail(err error) bool {
 }
 
 func (t *Task) build() error {
-	t.cmd = exec.Command("nix", "build", "--json", "--no-link",
-		t.config.Run.TaskFlake+"."+t.name+"."+t.config.Run.Runtime+".run")
+	t.cmd = exec.Command("nix", "build", "--json", "--no-link")
 
 	stderr := &bytes.Buffer{}
 	t.cmd.Stdout = stderr
 
 	t.preExec("build")
+
+	// XXX Unfortunately, until https://github.com/NixOS/nix/pull/6333 is merged,
+	// we cannot build this with only one nix command due to escaping issues.
+	// The `nix build` command takes an "installable" argument,
+	// which we would like to contain the attribute path to our task's runtime.
+	// However the installable is not interpreted as actual nix code
+	// but rather as URL component (after parsing percent-encoding).
+	// So if the task name contains `.` or `"` (and possibly other) characters
+	// we are not able to quote them and nix complains about a missing attribute.
+
+	var nameNixStr string
+	{
+		cmd := exec.Command("nix", "eval", "--impure", "--expr", `__getEnv "s"`)
+		cmd.Env = append(os.Environ(), "s="+t.name)
+		if out, err := cmd.Output(); err != nil {
+			return err
+		} else {
+			nameNixStr = string(out)
+		}
+	}
+
+	if drv, err := exec.Command(
+		"nix", "eval", "--raw", t.config.Run.TaskFlake,
+		"--apply", "f: f."+nameNixStr+"."+t.config.Run.Runtime+".run.drvPath",
+	).Output(); err != nil {
+		return err
+	} else {
+		t.cmd.Args = append(t.cmd.Args, string(drv))
+	}
 
 	return t.exec("wait", func() {
 		res := []nixBuildResult{}
