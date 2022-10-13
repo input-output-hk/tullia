@@ -128,4 +128,32 @@ import "strings"
 		_default_branch: body.repository.default_branch
 		_revision:       body.head_commit.id
 	}
+
+	github_pr_comment: {
+		#input:   string | *"GitHub PR comment to \(#repo)"
+
+		#repo:    =~"^[^/]+/[^/]+$"
+		#comment: string
+
+		inputs: {
+
+			"\(#input)": match: {
+				github_event: "issue_comment"
+				github_body: {
+					action: "created"
+
+					repository: full_name: #repo
+
+					issue: pull_request: {}
+
+					comment: body: =~#comment
+				}
+			}
+		}
+
+		let _body = inputs["\(#input)"].value.github_body
+		_repo:    _body.repository.full_name
+		_comment: _body.comment.body
+		_number:  _body.issue.number
+	}
 }
