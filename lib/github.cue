@@ -83,7 +83,7 @@ import "strings"
 		#tag?:           string
 		#default_branch: bool | *true
 
-		if #branch != _|_ {
+		if #branch != _|_ || #tag != _|_ {
 			#default_branch: false
 		}
 
