@@ -17,6 +17,14 @@
       version = "2022.05.18.001";
       inherit src vendorSha256;
 
+      meta = with lib; {
+        description = "CLI for Cicero tasks and actions";
+        homepage = "https://github.com/input-output-hk/tullia";
+        maintainers = with maintainers; [manveru dermetfan];
+        license = licenses.asl20;
+        platforms = platforms.unix;
+      };
+
       passthru.invalidHash =
         package "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
