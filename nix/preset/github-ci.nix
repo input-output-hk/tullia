@@ -197,11 +197,11 @@ in {
                       $git init --initial-branch=run
                       $git remote add origin "$remote"
                       $git fetch --depth 1 origin ${lib.escapeShellArg cfg.sha}
-                      $git checkout FETCH_HEAD
+                      $git checkout FETCH_HEAD --
                     ''
                     else ''
                       $git clone $remote .
-                      $git checkout ${lib.escapeShellArg cfg.sha}
+                      $git checkout ${lib.escapeShellArg cfg.sha} --
                     ''
                   )
                 );
