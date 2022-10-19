@@ -43,12 +43,13 @@ in {
 
     lib = mkOption {
       readOnly = true;
-      type = with types; attrsOf unspecified;
-      default.getRevision = fact: default: let
-        inherit (config.actionRun.facts.${fact}.value) github_body;
+      type = with types; lazyAttrsOf unspecified;
+      default.getRevision = factName: default: let
+        fact = config.actionRun.facts.${factName} or null;
       in
-        github_body.pull_request.head.sha
-        or github_body.head_commit.id
+        fact.value.github_body.pull_request.head.sha
+        or fact.value.github_body.head_commit.id
+        or fact.value.github_body.after
         or default;
     };
   };
