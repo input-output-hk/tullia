@@ -45,5 +45,8 @@
     })
     # top level tullia outputs
     lib
-    {inherit tasks doc;};
+    {
+      inherit tasks doc;
+      flakePartsModules = import nix/flakePartsModules.nix lib;
+    };
 }
