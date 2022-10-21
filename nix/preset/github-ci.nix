@@ -116,9 +116,9 @@ in {
           lib.pipe config.actionRun.action or null [
             (
               c:
-                if cfg.status.enableActionName && c != null
-                then "${c}: "
-                else ""
+                lib.optionalString
+                (cfg.status.enableActionName && c != null)
+                "${c}: "
             )
             lib.escapeShellArg
             (c: "${c}\"$TULLIA_TASK\"")
