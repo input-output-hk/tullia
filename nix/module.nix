@@ -30,11 +30,11 @@
     ];
 
   /*
-   Like `filterAttrs` for values of a module evaluation.
-   
-   The predicate function receives the path to the value,
-   its option declaration and the resolved value itself.
-   */
+  Like `filterAttrs` for values of a module evaluation.
+
+  The predicate function receives the path to the value,
+  its option declaration and the resolved value itself.
+  */
   filterOptionValues = let
     recurse = p: pred: options: values:
       if !__isAttrs values

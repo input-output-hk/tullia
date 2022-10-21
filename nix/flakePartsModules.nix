@@ -26,9 +26,11 @@ flakeLib: rec {
     config = let
       mkSystemOutputs = system: config': let
         simple = flakeLib.fromSimple system config'.tullia;
-      in simple // {
-        tullia = {inherit (simple.tullia) task wrappedTask dag;};
-      };
+      in
+        simple
+        // {
+          tullia = {inherit (simple.tullia) task wrappedTask dag;};
+        };
     in {
       flake = {
         tullia =

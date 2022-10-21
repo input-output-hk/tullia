@@ -145,10 +145,10 @@ in rec {
   };
 
   /*
-   Like `mapAttrsRecursiveCond` from nixpkgs
-   but the condition and mapping functions
-   take the attribute path as their first parameter.
-   */
+  Like `mapAttrsRecursiveCond` from nixpkgs
+  but the condition and mapping functions
+  take the attribute path as their first parameter.
+  */
   mapAttrsRecursiveCondWithPath = cond: f: let
     recurse = path:
       __mapAttrs (
@@ -165,10 +165,10 @@ in rec {
     recurse [];
 
   /*
-   Returns the paths to values that satisfy the given predicate in the given attrset.
-   The predicate and recursion predicate functions take path and value as their parameters.
-   If the recursion prediate function is null, it defaults to the negated predicate.
-   */
+  Returns the paths to values that satisfy the given predicate in the given attrset.
+  The predicate and recursion predicate functions take path and value as their parameters.
+  If the recursion prediate function is null, it defaults to the negated predicate.
+  */
   findAttrsRecursiveCond = cond: pred: attrs:
     collect __isList (
       mapAttrsRecursiveCondWithPath
@@ -202,18 +202,18 @@ in rec {
     );
 
   /*
-   Given an arbitrarily deeply nested attrset of derivations,
-   returns an attrset of tasks that build each derivation.
-   The `mkName` function receives the path to each attribute
-   as its first and only parameter.
-   Read about `findAttrsRecursiveCond` for details about the
-   `cond` recursion function.
-   The returned tasks have extra module options called
-   `drvToTask.{attrPath,installable}`, where
-   `attrPath` is a read-only list of strings and
-   `installable` is an UNDEFINED string that will be passed to `nix build`.
-   Make sure to import the returned task in another module that sets `installable`!
-   */
+  Given an arbitrarily deeply nested attrset of derivations,
+  returns an attrset of tasks that build each derivation.
+  The `mkName` function receives the path to each attribute
+  as its first and only parameter.
+  Read about `findAttrsRecursiveCond` for details about the
+  `cond` recursion function.
+  The returned tasks have extra module options called
+  `drvToTask.{attrPath,installable}`, where
+  `attrPath` is a read-only list of strings and
+  `installable` is an UNDEFINED string that will be passed to `nix build`.
+  Make sure to import the returned task in another module that sets `installable`!
+  */
   drvToTaskRecursiveCond = cond: mkName: attrs:
     __listToAttrs (
       map
@@ -260,13 +260,13 @@ in rec {
   drvToTaskRecursive = drvToTaskRecursiveCond null;
 
   /*
-   Given a flake output's path as a list of strings and an evaluated flake,
-   returns an attrset of tasks for every derivation recursively found.
-   The returned tasks have an extra module option called `flakeOutputTask.flakeUrl`
-   that defaults to `.` but can be changed.
-   Also see `drvToTaskRecursive` for further information about the module
-   that is returned for each task.
-   */
+  Given a flake output's path as a list of strings and an evaluated flake,
+  returns an attrset of tasks for every derivation recursively found.
+  The returned tasks have an extra module option called `flakeOutputTask.flakeUrl`
+  that defaults to `.` but can be changed.
+  Also see `drvToTaskRecursive` for further information about the module
+  that is returned for each task.
+  */
   flakeOutputTasks = path: flake: let
     mkFlakeFragement = p: showAttrPath (path ++ p);
   in
@@ -293,9 +293,9 @@ in rec {
     );
 
   /*
-   Returns attrset of tullia tasks named with the given prefix
-   that run the corresponding task and depend on each other in the order given.
-   */
+  Returns attrset of tullia tasks named with the given prefix
+  that run the corresponding task and depend on each other in the order given.
+  */
   taskSequence = prefix: tasks: taskNames:
     __listToAttrs (
       imap0 (
