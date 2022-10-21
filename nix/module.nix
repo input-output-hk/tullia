@@ -786,7 +786,7 @@
                       --group "$gid" \
                       ''${cgroupV2Mount:+--use_cgroupv2} \
                       ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${lib.escapeShellArg config.name}"}
+                      -- ${task.computedCommand}/bin/${lib.escapeShellArg config.name}
                   '';
                 };
             };
