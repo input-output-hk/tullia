@@ -8,7 +8,7 @@
   ...
 }: let
   inherit (lib) mkOption;
-  inherit (lib.types) attrsOf submoduleWith attrs str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path addCheck;
+  inherit (lib.types) attrsOf submoduleWith str lines listOf enum ints package nullOr bool oneOf either anything strMatching function path addCheck;
 
   # Unlike the `submodule` type from nixpkgs this inherits `specialArgs` and `_module.args`.
   submodule = modules:
@@ -176,13 +176,21 @@
   }: let
     task = config;
     presets = {
+      facts = import ./preset/facts.nix;
       nix = import ./preset/nix.nix;
       bash = import ./preset/bash.nix;
       github-ci = import ./preset/github-ci.nix;
     };
   in {
     imports =
-      [{preset.bash.enable = lib.mkDefault true;}]
+      [
+        {
+          preset = {
+            facts.enable = lib.mkDefault true;
+            bash.enable = lib.mkDefault true;
+          };
+        }
+      ]
       ++ lib.attrValues presets;
 
     options = {
@@ -524,7 +532,7 @@
                   };
 
                   ExposedPorts = mkOption {
-                    type = attrsOf attrs;
+                    type = attrsOf (attrsOf anything);
                     default = toGoStruct ociConfig.exposedPorts;
                     inherit (ociOptions.exposedPorts) description;
                   };
@@ -541,7 +549,7 @@
                   };
 
                   Volumes = mkOption {
-                    type = attrsOf attrs;
+                    type = attrsOf (attrsOf anything);
                     default = toGoStruct ociConfig.volumes;
                     inherit (ociOptions.volumes) description;
                   };
@@ -651,18 +659,6 @@
                 Copy the task to local podman and execute it
               '';
               default = let
-                flags = {
-                  v = [
-                    ''"$alloc:/alloc"''
-                    ''"$HOME/.netrc:${task.env.HOME}/.netrc"''
-                    ''"$HOME/.docker/config.json:${task.env.HOME}/.docker/config.json"''
-                    ''"$PWD:/repo"''
-                  ];
-                  rmi = false;
-                  rm = true;
-                  # tty = false;
-                  # interactive = true;
-                };
                 imageName = getImageName config.oci.image;
               in
                 writers.shell {
@@ -682,12 +678,28 @@
                     trap finish EXIT
                     copy-to containers-storage:${imageName}
                     if tty -s; then
-                      echo "" | exec podman run --tty ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
+                      echo "" | exec podman run --tty ${toString (lib.cli.toGNUCommandLine {} podman.config.flags)} ${imageName}
                     else
-                      echo "" | exec podman run ${toString (lib.cli.toGNUCommandLine {} flags)} ${imageName}
+                      echo "" | exec podman run ${toString (lib.cli.toGNUCommandLine {} podman.config.flags)} ${imageName}
                     fi
                   '';
                 };
+            };
+
+            flags = mkOption {
+              type = attrsOf anything;
+              default = {
+                v = [
+                  ''"$alloc:/alloc"''
+                  ''"$HOME/.netrc:${task.env.HOME}/.netrc"''
+                  ''"$HOME/.docker/config.json:${task.env.HOME}/.docker/config.json"''
+                  ''"$PWD:/repo"''
+                ];
+                rmi = false;
+                rm = true;
+                # tty = false;
+                # interactive = true;
+              };
             };
 
             useHostStore = mkOption {

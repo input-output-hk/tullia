@@ -1,4 +1,5 @@
 {
+  options,
   config,
   pkgs,
   lib,
@@ -10,16 +11,14 @@ in {
   options.preset.${name} = with lib; {
     enable = mkEnableOption "${name} preset";
 
-    repo = mkOption {
-      type = types.str;
+    repo = options.preset.facts.factValueOption // {
       description = ''
         Path of the repository (the part after `github.com/`).
       '';
       example = "input-output-hk/tullia";
     };
 
-    sha = mkOption {
-      type = types.str;
+    sha = options.preset.facts.factValueOption // {
       example = "841342ce5a67acd93a78e5b1a56e6bbe92db926f";
       description = ''
         The Revision (SHA) of the commit to clone and report status on.
@@ -44,13 +43,35 @@ in {
     lib = mkOption {
       readOnly = true;
       type = with types; lazyAttrsOf unspecified;
-      default.getRevision = factName: default: let
-        fact = config.actionRun.facts.${factName} or null;
-      in
-        fact.value.github_body.pull_request.head.sha
-        or fact.value.github_body.head_commit.id
-        or fact.value.github_body.after
-        or default;
+      default = {
+        getRevision = factName: default: let
+          fact = config.actionRun.facts.${factName} or null;
+        in
+          fact.value.github_body.pull_request.head.sha
+          or fact.value.github_body.head_commit.id
+          or fact.value.github_body.after
+          or default;
+
+        readRevision = factName: default: {
+          outPath = getExe (
+            pkgs.callPackage ../writer/shell.nix {} {
+              name = "get-${factName}-github-revision";
+              runtimeInputs = [pkgs.jq];
+              text = ''
+                exec jq --{compact,raw}-output \
+                  --argjson default ${escapeShellArg (__toJSON default)} \
+                  '
+                    .value.github_body.pull_request.head.sha //
+                    .value.github_body.head_commit.id //
+                    .value.github_body.after //
+                    $default
+                  ' \
+                  "$TULLIA_FACTS"/${escapeShellArg factName}.json
+              '';
+            }
+          );
+        };
+      };
     };
   };
 
@@ -59,6 +80,9 @@ in {
       type = "shell";
       runtimeInputs = with pkgs; [coreutils jq curl];
       text = ''
+        cfgSha=$(${lib.escapeShellArg cfg.sha})
+        cfgRepo=$(${lib.escapeShellArg cfg.repo})
+
         function duration {
           local secs=$(($2 - $1))
 
@@ -141,7 +165,7 @@ in {
               ;;
           esac
 
-          echo >&2 -n "Reporting GitHub commit status $state on "${lib.escapeShellArg cfg.sha}" for \"$context\""
+          echo >&2 -n "Reporting GitHub commit status $state on $cfgSha for \"$context\""
           if [[ -n "$description" ]]; then
             echo >&2 ": $description"
           else
@@ -157,7 +181,7 @@ in {
             --arg state "$state" \
             --arg description "$description" \
             --arg context "$context" \
-          | curl ${lib.escapeShellArg "https://api.github.com/repos/${cfg.repo}/statuses/${cfg.sha}"} \
+          | curl "https://api.github.com/repos/$cfgRepo/statuses/$cfgSha" \
             --output /dev/null --fail-with-body \
             --no-progress-meter \
             -H 'Accept: application/vnd.github.v3+json' \
@@ -189,19 +213,19 @@ in {
                       exit 0
                     fi
                     git='git -c advice.detachedHead=false'
-                    remote=https://github.com/${lib.escapeShellArg cfg.repo}
+                    remote="https://github.com/$cfgRepo"
                   ''
                   + (
                     if cfg.clone.shallow
                     then ''
                       $git init --initial-branch=run
                       $git remote add origin "$remote"
-                      $git fetch --depth 1 origin ${lib.escapeShellArg cfg.sha}
+                      $git fetch --depth 1 origin "$cfgSha"
                       $git checkout FETCH_HEAD --
                     ''
                     else ''
                       $git clone $remote .
-                      $git checkout ${lib.escapeShellArg cfg.sha} --
+                      $git checkout "$cfgSha" --
                     ''
                   )
                 );
