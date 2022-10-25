@@ -20,6 +20,7 @@
       sandbox = false
       substituters = ${toString (__attrNames substituters)}
       trusted-public-keys = ${toString (__attrValues substituters)}
+      accept-flake-config = true
       EOF
     '';
 in {
