@@ -39,7 +39,7 @@ in {
     ];
 
     nsjail = {
-      mount."/tmp".options.size = 1024;
+      mount."/tmp".options.size = lib.mkDefault 1024;
       bindmount.rw = lib.mkOrder 300 [
         ''"$root:/"''
         "/dev"

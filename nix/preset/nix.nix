@@ -26,7 +26,7 @@ in {
   options.preset.nix.enable = lib.mkEnableOption "nix preset";
 
   config = lib.mkIf config.preset.nix.enable {
-    nsjail.mount."/tmp".options.size = 1024;
+    nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
     oci.copyToRoot = lib.mkBefore [nixConf];
 
