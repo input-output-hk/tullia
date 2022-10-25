@@ -28,7 +28,13 @@ in {
   config = lib.mkIf config.preset.nix.enable {
     nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
-    oci.copyToRoot = lib.mkBefore [nixConf];
+    oci.copyToRoot = lib.mkBefore [
+      (pkgs.buildEnv {
+        name = "nixConf";
+        pathsToLink = ["/etc"];
+        paths = [nixConf];
+      })
+    ];
 
     dependencies = with pkgs; [coreutils gitMinimal nix];
 
