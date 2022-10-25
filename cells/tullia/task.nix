@@ -117,7 +117,7 @@ in {
     preset.github-ci = {
       enable = config.actionRun.facts != {};
       repo = "input-output-hk/tullia";
-      sha =  config.preset.github-ci.lib.getRevision "github" null;
+      sha = config.preset.github-ci.lib.getRevision "github" null;
     };
   };
 }
