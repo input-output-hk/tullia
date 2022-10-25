@@ -40,7 +40,7 @@ in {
     commands = lib.mkOrder 300 [
       {
         type = "shell";
-        runtimeInputs = [pkgs.nix];
+        runtimeInputs = [pkgs.nix pkgs.coreutils];
         text = ''
           # Set up build user and group.
           echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:${config.env.HOME}:/bin/sh'

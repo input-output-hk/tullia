@@ -20,6 +20,7 @@ in {
       HOME = lib.mkDefault "/local/home";
       NIX_SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+      # handled by the commandType of the runtimeInputs in modules.nix
       # PATH = lib.makeBinPath config.dependencies;
       TERM = lib.mkDefault "xterm-256color";
       TULLIA_TASK = config.name;
