@@ -28,7 +28,7 @@ in {
   config = lib.mkIf config.preset.nix.enable {
     nsjail.mount."/tmp".options.size = 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
-    oci.contents = lib.mkBefore [nixConf];
+    oci.copyToRoot = lib.mkBefore [nixConf];
 
     dependencies = with pkgs; [coreutils gitMinimal nix];
 
