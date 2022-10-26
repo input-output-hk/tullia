@@ -26,7 +26,7 @@ func (r RunSpec) MarshalZerologObject(event *zerolog.Event) {
 
 	bin := zerolog.Dict()
 	for k, v := range r.Bin {
-		dag.Str(k, v)
+		bin.Str(k, v)
 	}
 	event.Dict("Bin", bin)
 }
