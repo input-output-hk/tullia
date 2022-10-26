@@ -1287,10 +1287,10 @@ in {
             commands = lib.mkForce [(moduleConfig.wrappedTask.${name}.command // {main = true;})];
 
             env = {
-              RUN_SPEC = __toJSON {
+              RUN_SPEC = "@" + pkgs.writeText "run-spec.json" (__toJSON {
                 inherit (moduleConfig) dag;
                 bin = __mapAttrs (n: v: "${v.unwrapped.run}/bin/${n}-unwrapped") enabledTasks;
-              };
+              });
               MODE = "passthrough";
               RUNTIME = "unwrapped";
             };

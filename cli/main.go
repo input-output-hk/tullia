@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	arg "github.com/alexflint/go-arg"
 	"github.com/rs/zerolog"
@@ -44,7 +45,7 @@ type Run struct {
 	Mode      string `arg:"--mode,env:MODE" default:"cli"`
 	Runtime   string `arg:"--runtime,env:RUNTIME" default:"nsjail"`
 	TaskFlake string `arg:"--task-flake,env:TASK_FLAKE" default:".#tullia.x86_64-linux.task"`
-	RunSpec   string `arg:"--run-spec,env:RUN_SPEC" help:"used internally"`
+	RunSpec   string `arg:"--run-spec,env:RUN_SPEC" help:"used internally. Start with @ to read from a file."`
 	runSpec   *RunSpec
 }
 
@@ -115,9 +116,20 @@ func main() {
 	case config.Run != nil:
 		if len(config.Run.RunSpec) > 0 {
 			rs := &RunSpec{}
-			if err := json.Unmarshal([]byte(config.Run.RunSpec), rs); err != nil {
+
+			rsStr := []byte(config.Run.RunSpec)
+			if strings.HasPrefix(config.Run.RunSpec, "@") {
+				if contents, err := os.ReadFile(config.Run.RunSpec[1:]); err != nil {
+					log.Fatal().Err(err).Msg("reading run spec from file")
+				} else {
+					rsStr = contents
+				}
+			}
+
+			if err := json.Unmarshal(rsStr, rs); err != nil {
 				log.Fatal().Err(err).Msg("parsing run spec")
 			}
+
 			config.Run.runSpec = rs
 		}
 
