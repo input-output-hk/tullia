@@ -11,19 +11,23 @@ in {
   options.preset.${name} = with lib; {
     enable = mkEnableOption "${name} preset";
 
-    repo = options.preset.facts.factValueOption // {
-      description = ''
-        Path of the repository (the part after `github.com/`).
-      '';
-      example = "input-output-hk/tullia";
-    };
+    repo =
+      options.preset.facts.factValueOption
+      // {
+        description = ''
+          Path of the repository (the part after `github.com/`).
+        '';
+        example = "input-output-hk/tullia";
+      };
 
-    sha = options.preset.facts.factValueOption // {
-      example = "841342ce5a67acd93a78e5b1a56e6bbe92db926f";
-      description = ''
-        The Revision (SHA) of the commit to clone and report status on.
-      '';
-    };
+    sha =
+      options.preset.facts.factValueOption
+      // {
+        example = "841342ce5a67acd93a78e5b1a56e6bbe92db926f";
+        description = ''
+          The Revision (SHA) of the commit to clone and report status on.
+        '';
+      };
 
     clone = {
       enable = mkEnableOption "clone the repo" // {default = true;};

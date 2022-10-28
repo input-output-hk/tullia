@@ -11,9 +11,10 @@ in {
     enable = mkEnableOption "${presetName} preset";
 
     factValueOption = mkOption {
-      type = with types; coercedTo
+      type = with types;
+        coercedTo
         str
-        (value: { inherit value; })
+        (value: {inherit value;})
         cfg.factValueType;
       inherit (cfg.factValueType) description;
     };
@@ -60,13 +61,16 @@ in {
                   then "fact:${config.factName}:${__concatStringsSep "." config.valuePath}"
                   else "value";
                 runtimeInputs = [pkgs.jq];
-                text = if config.factName != null then ''
-                  exec jq --{compact,raw}-output \
-                    ${escapeShellArg ("." + concatMapStringsSep "." __toJSON valuePath)} \
-                    "$TULLIA_FACTS"/${escapeShellArg factName}.json
-                '' else ''
-                  exec echo ${escapeShellArg config.value}
-                '';
+                text =
+                  if config.factName != null
+                  then ''
+                    exec jq --{compact,raw}-output \
+                      ${escapeShellArg ("." + concatMapStringsSep "." __toJSON valuePath)} \
+                      "$TULLIA_FACTS"/${escapeShellArg factName}.json
+                  ''
+                  else ''
+                    exec echo ${escapeShellArg config.value}
+                  '';
               }
             );
           };
