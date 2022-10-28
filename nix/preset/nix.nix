@@ -3,46 +3,39 @@
   pkgs,
   lib,
   ...
-}: let
-  nixConf = let
-    substituters = {
-      "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
-      "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
-      "https://cache.ci.iog.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
-    };
-  in
-    pkgs.runCommand "etc" {} ''
-      mkdir -p $out/etc/nix
-      cat <<EOF > $out/etc/nix/nix.conf
-      experimental-features = ca-derivations flakes nix-command recursive-nix
-      log-lines = 1000
-      show-trace = true
-      sandbox = false
-      substituters = ${toString (__attrNames substituters)}
-      trusted-public-keys = ${toString (__attrValues substituters)}
-      accept-flake-config = true
-      EOF
-    '';
-in {
+}: {
   options.preset.nix.enable = lib.mkEnableOption "nix preset";
 
   config = lib.mkIf config.preset.nix.enable {
     nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
-    oci.copyToRoot = lib.mkBefore [
-      (pkgs.buildEnv {
-        name = "nixConf";
-        pathsToLink = ["/etc"];
-        paths = [nixConf];
-      })
-    ];
+    oci.copyToRoot = let
+      substituters = {
+        "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
+        "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+        "https://cache.ci.iog.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
+      };
+    in
+      lib.mkBefore [
+        (
+          pkgs.runCommand "etc" {} ''
+            mkdir -p $out/etc/nix
+            cat <<EOF > $out/etc/nix/nix.conf
+            experimental-features = ca-derivations flakes nix-command recursive-nix
+            log-lines = 1000
+            show-trace = true
+            sandbox = false
+            substituters = ${toString (__attrNames substituters)}
+            trusted-public-keys = ${toString (__attrValues substituters)}
+            accept-flake-config = true
+            EOF
+          ''
+        )
+      ];
 
     dependencies = with pkgs; [coreutils gitMinimal nix];
 
-    env = {
-      USER = lib.mkDefault "nixbld1";
-      NIX_CONF_DIR = "${nixConf}/etc/nix";
-    };
+    env.USER = lib.mkDefault "nixbld1";
 
     commands = lib.mkOrder 300 [
       {
