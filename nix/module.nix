@@ -307,7 +307,7 @@
             image = mkOption {
               type = package;
               default = pkgs.buildImage {
-                inherit (task.oci) name tag maxLayers layers contents config;
+                inherit (task.oci) name tag maxLayers layers copyToRoot config;
                 initializeNixDatabase = true;
               };
             };
@@ -329,14 +329,14 @@
               apply = lib.unique;
               description = ''
                 A list of layers built with the buildLayer function: if a store
-                path in deps or contents belongs to one of these layers, this
+                path in deps or copyToRoot belongs to one of these layers, this
                 store path is skipped. This is pretty useful to isolate store
                 paths that are often updated from more stable store paths, to
                 speed up build and push time.
               '';
             };
 
-            contents = mkOption {
+            copyToRoot = mkOption {
               type = listOf package;
               # to avoid failure in nix2container's makeNixDatabase
               apply = lib.unique;
@@ -569,7 +569,7 @@
             layers = lib.mkDefault (
               lib.optional (rootDir != null) (
                 pkgs.buildLayer {
-                  contents = [
+                  copyToRoot = [
                     (pkgs.symlinkJoin {
                       name = "rootDir";
                       paths = [rootDir];
@@ -579,7 +579,7 @@
               )
             );
 
-            contents = lib.mkDefault [
+            copyToRoot = lib.mkDefault [
               (pkgs.symlinkJoin {
                 name = "root";
                 paths = [task.closure.closure] ++ task.dependencies;
@@ -757,6 +757,12 @@
                     uid="''${UID:-$(id -u)}"
                     gid="''${GID:-$(id -g)}"
 
+
+                    # if you got the permission error like  Couldn't write '5' bytes to file
+                    # '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service//NSJAIL.13077/cgroup.procs'
+                    # run the following command
+                    # sudo chown "$USER":users /sys/fs/cgroup/user.slice/user-1000.slice/*
+
                     cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
                     if [ ! -d "$cgroupV2Mount" ]; then
                       unset cgroupV2Mount
@@ -786,7 +792,7 @@
                       --group "$gid" \
                       ''${cgroupV2Mount:+--use_cgroupv2} \
                       ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${lib.escapeShellArg "${task.computedCommand}/bin/${lib.escapeShellArg config.name}"}
+                      -- ${task.computedCommand}/bin/${lib.escapeShellArg config.name}
                   '';
                 };
             };

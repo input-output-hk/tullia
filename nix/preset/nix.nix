@@ -7,9 +7,9 @@
   options.preset.nix.enable = lib.mkEnableOption "nix preset";
 
   config = lib.mkIf config.preset.nix.enable {
-    nsjail.mount."/tmp".options.size = 1024;
+    nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
-    oci.contents = let
+    oci.copyToRoot = let
       substituters = {
         "https://cache.nixos.org" = "cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY=";
         "https://hydra.iohk.io" = "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=";
@@ -27,6 +27,7 @@
             sandbox = false
             substituters = ${toString (__attrNames substituters)}
             trusted-public-keys = ${toString (__attrValues substituters)}
+            accept-flake-config = true
             EOF
           ''
         )
@@ -39,7 +40,7 @@
     commands = lib.mkOrder 300 [
       {
         type = "shell";
-        runtimeInputs = [pkgs.nix];
+        runtimeInputs = [pkgs.nix pkgs.coreutils];
         text = ''
           # Set up build user and group.
           echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:${config.env.HOME}:/bin/sh'

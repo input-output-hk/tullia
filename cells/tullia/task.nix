@@ -115,9 +115,9 @@ in {
     memory = 2 * 1024;
     preset.nix.enable = true;
     preset.github-ci = {
-      enable = config.action.facts != {};
+      enable = config.actionRun.facts != {};
       repo = "input-output-hk/tullia";
-      sha = config.action.facts.push.value.sha or "";
+      sha = config.preset.github-ci.lib.getRevision "github" null;
     };
   };
 }
