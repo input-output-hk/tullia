@@ -40,7 +40,7 @@
     commands = lib.mkOrder 300 [
       {
         type = "shell";
-        runtimeInputs = [pkgs.nix pkgs.coreutils];
+        runtimeInputs = [pkgs.nix];
         text = ''
           # Set up build user and group.
           echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:${config.env.HOME}:/bin/sh'
@@ -57,7 +57,12 @@
             echo populating nix store...
             nix-store --load-db < /registration
           fi
-
+        '';
+      }
+      {
+        type = "shell";
+        runtimeInputs = [pkgs.coreutils];
+        text = ''
           # Make sure permissions are open enough.
           # On certain runtimes like containers
           # this may be a volume that is created
