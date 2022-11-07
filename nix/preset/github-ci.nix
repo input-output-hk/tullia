@@ -83,12 +83,12 @@ in {
         function timer {
           case "$1" in
             start)
-              mkdir -p "/alloc/tullia/task/$TULLIA_TASK/github-ci"
-              date +%s > "/alloc/tullia/task/$TULLIA_TASK/github-ci/start-timestamp"
+              mkdir -p "$NOMAD_ALLOC_DIR/tullia/task/$TULLIA_TASK/github-ci"
+              date +%s > "$NOMAD_ALLOC_DIR/tullia/task/$TULLIA_TASK/github-ci/start-timestamp"
               ;;
             stop)
               local start end
-              start=$(< "/alloc/tullia/task/$TULLIA_TASK/github-ci/start-timestamp")
+              start=$(< "$NOMAD_ALLOC_DIR/tullia/task/$TULLIA_TASK/github-ci/start-timestamp")
               end=$(date +%s)
               duration "$start" "$end"
               ;;
@@ -214,7 +214,7 @@ in {
 
       nomad.templates = [
         {
-          destination = "/secrets/cicero/github/token";
+          destination = "\${NOMAD_SECRETS_DIR}/cicero/github/token";
           data = ''{{with secret "kv/data/cicero/github"}}{{.Data.data.token}}{{end}}'';
         }
       ];
