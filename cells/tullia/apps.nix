@@ -102,4 +102,52 @@ in {
       platforms = platforms.unix;
     };
   };
+
+  nix-systems = let
+    basic = nixpkgs.writeShellApplication {
+      name = "nix-systems";
+
+      runtimeInputs = with nixpkgs; [ coreutils util-linux jq ];
+
+      text = ''
+        {
+          config=$(nix show-config --json)
+
+          system=$(<<< "$config" jq --raw-output '.system.value | select(. != null)')
+          if [[ -n "$system" ]]; then
+            echo "$system"
+          fi
+
+          configBuilders=$(<<< "$config" jq --raw-output '.builders.value | select(. != null)')
+          <<< "$configBuilders" readarray -d \; -t builders
+
+          for builder in "''${builders[@]}"; do
+            systemsComma=$(
+              <<< "$builder" \
+              column --json --table-columns remote,systems,ssh-id,max-builds,speed-factor,features-supported,features-mandatory,ssh-host \
+              | jq --raw-output '.table[].systems | select(. != null)'
+            )
+
+            unset builderSystems
+            <<< "$systemsComma" readarray -d , -t builderSystems
+
+            for system in "''${builderSystems[@]}"; do
+              system="''${system%$'\n'}"
+              if [[ -n "$system" ]]; then
+                echo "$system"
+              fi
+            done
+          done
+        } | sort --unique
+      '';
+    };
+  in
+    basic // {
+      meta = with lib; basic.meta // {
+        description = "Prints what platforms nix is capable of building for.";
+        maintainers = with maintainers; [dermetfan];
+        license = licenses.gpl3Plus;
+        platforms = platforms.unix;
+      };
+    };
 }
