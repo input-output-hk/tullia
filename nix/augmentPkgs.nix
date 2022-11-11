@@ -1,4 +1,4 @@
-inputs: system: (let
+inputs: system: let
   pkgs = inputs.nixpkgs.legacyPackages.${system}.extend (
     inputs.nixpkgs.lib.composeManyExtensions [
       inputs.nix-nomad.overlays.default
@@ -30,29 +30,29 @@ inputs: system: (let
       })
     ]
   );
-  tullia = inputs.self.packages.${system}.default;
-  inherit (inputs.nix2container.packages.${system}.nix2container) buildImage buildLayer;
-  inherit (pkgs.lib) fileContents splitString;
-  getClosure = {
-    script,
-    env,
-  }: let
-    closure =
-      pkgs.closureInfo
-      {
-        rootPaths = {
-          inherit script;
-          env = pkgs.writeTextDir "nix-support/env" (builtins.toJSON env);
-        };
-      };
-    content = fileContents "${closure}/store-paths";
-  in {
-    inherit closure;
-    storePaths = splitString "\n" content;
-  };
 in
   pkgs
   // {
-    inherit tullia buildImage buildLayer getClosure;
+    inherit (inputs.self.packages.${system}) tullia nix-systems;
+    inherit (inputs.nix2container.packages.${system}.nix2container) buildImage buildLayer;
     inherit (inputs) nix-nomad;
-  })
+
+    getClosure = {
+      script,
+      env,
+    }: let
+      inherit (pkgs.lib) fileContents splitString;
+      closure =
+        pkgs.closureInfo
+        {
+          rootPaths = {
+            inherit script;
+            env = pkgs.writeTextDir "nix-support/env" (builtins.toJSON env);
+          };
+        };
+      content = fileContents "${closure}/store-paths";
+    in {
+      inherit closure;
+      storePaths = splitString "\n" content;
+    };
+  }
