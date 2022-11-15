@@ -33,7 +33,13 @@
         )
       ];
 
-    dependencies = with pkgs; [coreutils gitMinimal nix nix-systems];
+    dependencies = with pkgs; [
+      coreutils
+      gitMinimal
+      nix
+      nix-systems
+      openssh # for nix remote builds
+    ];
 
     env.USER = lib.mkDefault "nixbld1";
 
