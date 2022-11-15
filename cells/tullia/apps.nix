@@ -107,7 +107,7 @@ in {
     basic = nixpkgs.writeShellApplication {
       name = "nix-systems";
 
-      runtimeInputs = with nixpkgs; [ coreutils util-linux jq ];
+      runtimeInputs = with nixpkgs; [coreutils util-linux jq];
 
       text = ''
         {
@@ -142,12 +142,15 @@ in {
       '';
     };
   in
-    basic // {
-      meta = with lib; basic.meta // {
-        description = "Prints what platforms nix is capable of building for.";
-        maintainers = with maintainers; [dermetfan];
-        license = licenses.gpl3Plus;
-        platforms = platforms.unix;
-      };
+    basic
+    // {
+      meta = with lib;
+        basic.meta
+        // {
+          description = "Prints what platforms nix is capable of building for.";
+          maintainers = with maintainers; [dermetfan];
+          license = licenses.gpl3Plus;
+          platforms = platforms.unix;
+        };
     };
 }
