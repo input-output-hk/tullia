@@ -124,7 +124,7 @@
     };
 
   commandType = task:
-    submodule {
+    submodule (command: {
       options = {
         type = mkOption {
           type = enum (lib.attrNames writers);
@@ -153,8 +153,14 @@
         text = mkOption {
           type = either str path;
           description = ''
-            Type of the command
+            Source of the command
           '';
+          apply = v:
+            lib.optionalString (
+              with command.config;
+                main && type == "shell"
+            ) "set -x\n"
+            + v;
         };
 
         main = mkOption {
@@ -166,7 +172,7 @@
           '';
         };
       };
-    };
+    });
 
   taskType = submodule ({
     name,
