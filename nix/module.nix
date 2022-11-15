@@ -181,23 +181,20 @@
     ...
   }: let
     task = config;
-    presets = {
-      facts = import ./preset/facts.nix;
-      nix = import ./preset/nix.nix;
-      bash = import ./preset/bash.nix;
-      github-ci = import ./preset/github-ci.nix;
-    };
   in {
-    imports =
-      [
-        {
-          preset = {
-            facts.enable = lib.mkDefault true;
-            bash.enable = lib.mkDefault true;
-          };
-        }
-      ]
-      ++ lib.attrValues presets;
+    imports = [
+      preset/facts.nix
+      preset/nix.nix
+      preset/bash.nix
+      preset/github.nix
+      preset/git.nix
+      {
+        preset = {
+          facts.enable = lib.mkDefault true;
+          bash.enable = lib.mkDefault true;
+        };
+      }
+    ];
 
     options = {
       enable = lib.mkEnableOption "the task" // {default = true;};
