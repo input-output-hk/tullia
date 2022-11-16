@@ -110,35 +110,90 @@ in {
       runtimeInputs = with nixpkgs; [coreutils util-linux jq];
 
       text = ''
-        {
-          config=$(nix show-config --json)
+        while getopts :fFjh opt; do
+          case "$opt" in
+            F) invert=1 ;&
+            f) filter=1 ;;
+            j) jsonInput=1 ;;
+            h)
+              >&2 echo 'Without arguments, prints which systems nix can build for on this machine.'
+              >&2 echo 'With -f, expects a list of systems on stdin and prints only its supported elements.'
+              >&2 echo 'With -F, expects a list of systems on stdin and prints only its unsupported elements.'
+              >&2 echo 'With -j, expects stdin to be a JSON list.'
+              exit
+              ;;
+            ?)
+              >&2 echo 'Unknown flag'
+              exit 1
+              ;;
+          esac
+        done
+        shift $((OPTIND - 1))
 
-          system=$(<<< "$config" jq --raw-output '.system.value | select(. != null)')
-          if [[ -n "$system" ]]; then
-            echo "$system"
-          fi
+        supported=$(
+          {
+            config=$(nix show-config --json)
 
-          configBuilders=$(<<< "$config" jq --raw-output '.builders.value | select(. != null)')
-          <<< "$configBuilders" readarray -d \; -t builders
+            system=$(<<< "$config" jq --raw-output '.system.value | select(. != null)')
+            if [[ -n "$system" ]]; then
+              echo "$system"
+            fi
 
-          for builder in "''${builders[@]}"; do
-            systemsComma=$(
-              <<< "$builder" \
-              column --json --table-columns remote,systems,ssh-id,max-builds,speed-factor,features-supported,features-mandatory,ssh-host \
-              | jq --raw-output '.table[].systems | select(. != null)'
-            )
+            configBuilders=$(<<< "$config" jq --raw-output '.builders.value | select(. != null)')
+            <<< "$configBuilders" readarray -d \; -t builders
 
-            unset builderSystems
-            <<< "$systemsComma" readarray -d , -t builderSystems
+            for builder in "''${builders[@]}"; do
+              systemsComma=$(
+                <<< "$builder" \
+                column --json --table-columns remote,systems,ssh-id,max-builds,speed-factor,features-supported,features-mandatory,ssh-host \
+                | jq --raw-output '.table[].systems | select(. != null)'
+              )
 
-            for system in "''${builderSystems[@]}"; do
-              system="''${system%$'\n'}"
-              if [[ -n "$system" ]]; then
-                echo "$system"
-              fi
+              unset builderSystems
+              <<< "$systemsComma" readarray -d , -t builderSystems
+
+              for system in "''${builderSystems[@]}"; do
+                system="''${system%$'\n'}"
+                if [[ -n "$system" ]]; then
+                  echo "$system"
+                fi
+              done
             done
+          } | sort --unique
+        )
+
+        if [[ -z "''${filter:-}" ]]; then
+          echo "$supported"
+          exit
+        fi
+
+        if [[ -n "''${jsonInput:-}" ]]; then
+          input=$(jq --raw-output 'join("\n")')
+        else
+          while read -r; do
+            input+="$REPLY"$'\n'
           done
-        } | sort --unique
+        fi
+
+        input=$(<<< "$input" sort --unique)
+
+        if [[ -n "''${invert:-}" ]]; then
+          while read -r a; do
+            while read -r b; do
+              if [[ "$a" = "$b" ]]; then
+                continue 2
+              fi
+            done <<< "$supported"
+            echo "$a"
+          done | sort --unique
+        else
+          {
+            while read -r; do
+              echo "$REPLY"
+            done
+            echo "$supported"
+          } | sort | uniq --repeated
+        fi <<< "$input"
       '';
     };
   in
