@@ -110,16 +110,26 @@ in {
       runtimeInputs = with nixpkgs; [coreutils util-linux jq];
 
       text = ''
-        while getopts :fFjh opt; do
+        if [[ $# -eq 0 ]]; then
+          stdoutJson=false
+        fi
+
+        while getopts :lrIioOh opt; do
           case "$opt" in
-            F) invert=1 ;&
-            f) filter=1 ;;
-            j) jsonInput=1 ;;
+            l) remote=false ;;
+            r) local=false ;;
+            I) stdinJson=false ;&
+            i) stdin=true ;;
+            o) invert=true ;&
+            O) stdoutJson=false ;;
             h)
               >&2 echo 'Without arguments, prints which systems nix can build for on this machine.'
-              >&2 echo 'With -f, expects a list of systems on stdin and prints only its supported elements.'
-              >&2 echo 'With -F, expects a list of systems on stdin and prints only its unsupported elements.'
-              >&2 echo 'With -j, expects stdin to be a JSON list.'
+              >&2 echo 'With -l, considers only the system of local machine to be supported.'
+              >&2 echo 'With -r, considers only systems of remote builders to be supported.'
+              >&2 echo 'With -i, prints whether the systems read from the JSON list on stdin are supported.'
+              >&2 echo 'With -I, prints whether the systems read from lines on stdin are supported.'
+              >&2 echo 'With -O, prints supported systems line by line.'
+              >&2 echo 'With -o, prints unsupported systems line by line.'
               exit
               ;;
             ?)
@@ -130,70 +140,64 @@ in {
         done
         shift $((OPTIND - 1))
 
-        supported=$(
-          {
-            config=$(nix show-config --json)
-
-            system=$(<<< "$config" jq --raw-output '.system.value | select(. != null)')
-            if [[ -n "$system" ]]; then
-              echo "$system"
-            fi
-
-            configBuilders=$(<<< "$config" jq --raw-output '.builders.value | select(. != null)')
-            <<< "$configBuilders" readarray -d \; -t builders
-
-            for builder in "''${builders[@]}"; do
-              systemsComma=$(
-                <<< "$builder" \
-                column --json --table-columns remote,systems,ssh-id,max-builds,speed-factor,features-supported,features-mandatory,ssh-host \
-                | jq --raw-output '.table[].systems | select(. != null)'
-              )
-
-              unset builderSystems
-              <<< "$systemsComma" readarray -d , -t builderSystems
-
-              for system in "''${builderSystems[@]}"; do
-                system="''${system%$'\n'}"
-                if [[ -n "$system" ]]; then
-                  echo "$system"
-                fi
-              done
-            done
-          } | sort --unique
-        )
-
-        if [[ -z "''${filter:-}" ]]; then
-          echo "$supported"
-          exit
+        if [[ -z "''${stdin:-}" ]]; then
+          nullInput=--null-input
         fi
 
-        if [[ -n "''${jsonInput:-}" ]]; then
-          input=$(jq --raw-output 'join("\n")')
-        else
-          while read -r; do
-            input+="$REPLY"$'\n'
-          done
-        fi
+        jq --raw-{input,output} --slurp ''${nullInput:-} \
+          --argjson local "''${local:-true}" \
+          --argjson remote "''${remote:-true}" \
+          --argjson stdin "''${stdin:-false}" \
+          --argjson stdinJson "''${stdinJson:-true}" \
+          --argjson invert "''${invert:-false}" \
+          --argjson stdoutJson "''${stdoutJson:-true}" \
+          --argjson config "$(nix show-config --json)"  \
+          '
+            (
+              $config |
+              [
+                if $local
+                then .system.value
+                else empty
+                end
+              ] + (
+                if $remote
+                then
+                  .builders.value |
+                  split(";") |
+                  map(
+                    gsub("^\\s+"; "") |
+                    split(" ")[1] |
+                    split(",")
+                  ) |
+                  flatten
+                else []
+                end
+              ) |
+              unique
+            ) as $supported |
 
-        input=$(<<< "$input" sort --unique)
+            (
+              if $stdin
+              then
+                if $stdinJson
+                then fromjson
+                else split("\n")
+                end |
+                map(select(. != "")) |
+                with_entries(.key = .value | .value |= IN($supported[]))
+              else $supported | with_entries(.key = .value | .value = true)
+              end
+            ) as $output |
 
-        if [[ -n "''${invert:-}" ]]; then
-          while read -r a; do
-            while read -r b; do
-              if [[ "$a" = "$b" ]]; then
-                continue 2
-              fi
-            done <<< "$supported"
-            echo "$a"
-          done | sort --unique
-        else
-          {
-            while read -r; do
-              echo "$REPLY"
-            done
-            echo "$supported"
-          } | sort | uniq --repeated
-        fi <<< "$input"
+            if $stdoutJson
+            then $output
+            else
+              $output |
+              with_entries(select(.value != $invert)) |
+              keys | join("\n")
+            end
+          '
       '';
     };
   in
