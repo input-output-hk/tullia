@@ -144,6 +144,26 @@ in {
           nullInput=--null-input
         fi
 
+        config=$(nix show-config --json)
+        builders=$(<<< "$config" jq --raw-output .builders.value)
+        if [[ "$builders" = @* ]]; then
+          if [[ -r "''${builders#@}" ]]; then
+            builders=$(< "''${builders#@}")
+          else
+            builders='''
+          fi
+          config=$(
+            <<< "$config" \
+            jq --arg builders "$builders" '
+              .builders.value = (
+                $builders |
+                split("\n") |
+                join(";")
+              )
+            '
+          )
+        fi
+
         jq --raw-{input,output} --slurp ''${nullInput:-} \
           --argjson local "''${local:-true}" \
           --argjson remote "''${remote:-true}" \
@@ -151,7 +171,7 @@ in {
           --argjson stdinJson "''${stdinJson:-true}" \
           --argjson invert "''${invert:-false}" \
           --argjson stdoutJson "''${stdoutJson:-true}" \
-          --argjson config "$(nix show-config --json)"  \
+          --argjson config "$config"  \
           '
             (
               $config |
