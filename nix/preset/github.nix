@@ -215,7 +215,7 @@ in {
               else ''
                 # ignore all flags
                 #shellcheck disable=2034
-                while getopts : opt; do :; done
+                while getopts :c:s:d: opt; do :; done
                 shift $((OPTIND - 1))
 
                 if [[ $# -gt 0 ]]; then
