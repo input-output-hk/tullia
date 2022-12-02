@@ -224,10 +224,31 @@ in {
               '';
           });
 
+          # Returns the path to an exectuable that
+          # runs `each` for each key of the JSON object returned by `bulk`
+          # and reports a status to GitHub
+          # according to the configuration in `preset.github.status`
+          # based on the exit code.
           reportBulk = {
-            bulk, # writer args
-            each, # writer args
+            # This is an attrset of writer args. See `../writer` for details.
+            # Set `type` to select which writer to use (defaults to `shell`).
+            # The resulting executable must print a JSON object on stdout.
+            # The key names of that object are arbitrary but their values must be a boolean.
+            # `true` means `each` will be run for this key.
+            # `false` means the key will be skipped and an `error` status will be reported.
+            bulk,
+            # This is an attrset of writer args. See `../writer` for details.
+            # Set `type` to select which writer to use (defaults to `shell`).
+            # The resulting executable is invoked for each key from `bulk` that had a `true` value
+            # with that key as the first and only argument.
+            each,
+            # A suffix to append to the context of the GitHub commit status.
+            # The shell variable `$elem` is set to the key from `bulk`.
+            # This is interpolated verbatim into the bash source so make sure it is properly escaped.
             contextSuffix ? ''" ($elem)"'',
+            # The description for the GitHub commit status that is reported for skipped elements.
+            # The shell variable `$elem` is set to the key from `bulk`.
+            # This is interpolated verbatim into the bash source so make sure it is properly escaped.
             skippedDescription ? "Skipped",
           }: let
             name = "github-status-report-bulk";
