@@ -48,12 +48,16 @@ in {
     commands = lib.mkOrder 400 [
       {
         type = "shell";
-        runtimeInputs = with pkgs; [gitMinimal];
+        runtimeInputs = with pkgs; [gitMinimal lockfileProgs];
         text =
           ''
+            lockName=".tullia-git"
+            lockfile-create "$lockName"
+
             # Exit if the current directory is a git repo because
             # that likely means some dependency task has already cloned.
             if [[ -d .git ]]; then
+              lockfile-remove "$lockName"
               exit 0
             fi
 
@@ -74,7 +78,10 @@ in {
               $git clone "$cfgRemote" .
               $git checkout "$cfgRef" --
             ''
-          );
+          )
+          + ''
+            lockfile-remove "$lockName"
+          '';
       }
     ];
 
