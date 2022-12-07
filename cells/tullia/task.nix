@@ -75,7 +75,6 @@ in {
         "goodbye"
         "hello"
         "lint"
-        "nix-build"
         "nix-preset"
         "tidy"
       ];
@@ -109,15 +108,4 @@ in {
       end
     ''
     // {preset.nix.enable = true;};
-
-  nix-build = {config, ...}: {
-    command.text = "nix build";
-    memory = 2 * 1024;
-    preset.nix.enable = true;
-    preset.github-ci = {
-      enable = config.actionRun.facts != {};
-      repo = "input-output-hk/tullia";
-      sha = config.preset.github-ci.lib.readRevision "github" null;
-    };
-  };
 }
