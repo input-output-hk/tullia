@@ -642,6 +642,10 @@
                         task.oci.image
                         // {__toString = getImageName;}
                       );
+                      exec = {
+                        command = lib.mkDefault "${task.computedCommand}/bin/${task.name}";
+                        store_paths = lib.mkDefault ([task.closure.closure] ++ task.dependencies);
+                      };
                     }
                     .${args.config.driver}
                     or (throw "Driver '${args.config.driver}' not supported yet")
@@ -1073,6 +1077,11 @@
                           name = getImageName task.config.image;
                           imageDrv = task.config.image.drvPath;
                         }
+                        else if task.config ? store_paths
+                        then {
+                          type = "nix";
+                          derivations = map (p: p.drvPath) task.config.store_paths;
+                        }
                         else null
                     )
                     group.task
@@ -1086,7 +1095,8 @@
         description = ''
           Specification of steps Cicero's evaluator must run
           to prepare all that is needed for job execution,
-          like pushing the OCI image the job references.
+          like pushing the OCI image or nix store paths
+          that the job references.
         '';
       };
 
