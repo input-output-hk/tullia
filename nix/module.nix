@@ -520,7 +520,7 @@
 
             config = mkOption {
               default = {};
-              type = submodule (imageConfig: {
+              type = submodule {
                 options = let
                   toGoStruct = m: __mapAttrs (k: v: {}) (lib.filterAttrs (k: v: v) m);
                 in {
@@ -572,7 +572,7 @@
                     inherit (ociOptions.stopSignal) type description;
                   };
                 };
-              });
+              };
             };
           };
 
