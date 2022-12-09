@@ -3,10 +3,20 @@
   pkgs,
   lib,
   ...
-}: {
-  options.preset.nix.enable = lib.mkEnableOption "nix preset";
+}: let
+  cfg = config.preset.nix;
+in {
+  options.preset.nix = with lib; {
+    enable = mkEnableOption "nix preset";
 
-  config = lib.mkIf config.preset.nix.enable {
+    package = mkOption {
+      type = types.package;
+      default = pkgs.nix;
+      description = "The nix package to install.";
+    };
+  };
+
+  config = lib.mkIf cfg.enable {
     nsjail.mount."/tmp".options.size = lib.mkDefault 1024;
     nsjail.bindmount.ro = lib.mkBefore ["${config.closure.closure}/registration:/registration"];
     oci.copyToRoot = let
@@ -35,7 +45,7 @@
     dependencies = with pkgs; [
       coreutils
       gitMinimal
-      nix
+      cfg.package
       nix-systems
       openssh # for nix remote builds
     ];
