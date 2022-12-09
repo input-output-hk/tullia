@@ -37,7 +37,7 @@
   */
   filterOptionValues = let
     recurse = p: pred: options: values:
-      if !__isAttrs values
+      if !__isAttrs values || lib.isDerivation values
       then values
       else
         __mapAttrs
