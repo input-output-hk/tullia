@@ -84,7 +84,7 @@ in {
       name = "facts";
       paths =
         lib.mapAttrsToList
-        (k: v: __toFile "${k}.json" (__toJSON v))
+        (k: v: pkgs.writeTextDir "${k}.json" (__toJSON v))
         config.actionRun.facts;
     };
 
