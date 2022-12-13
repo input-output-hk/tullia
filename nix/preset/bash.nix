@@ -26,8 +26,8 @@ in {
       TULLIA_TASK = config.name;
     };
 
-    commands = lib.mkOrder 300 [
-      {
+    commands = lib.mkOrder 300 (
+      lib.optional (config.runtime == "podman") {
         type = "shell";
         text = ''
           # Set up root user and group.
@@ -36,7 +36,7 @@ in {
           echo >> /etc/group  'root:x:0:'
         '';
       }
-    ];
+    );
 
     nsjail = {
       mount."/tmp".options.size = lib.mkDefault 1024;
