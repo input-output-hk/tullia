@@ -1344,6 +1344,13 @@ in {
             dependencies = [pkgs.tullia];
 
             command.text = ''
+              set +x
+              if [[ -n "$NOMAD_JOB_ID" ]]; then
+                mkdir /repo
+                cd /repo
+              fi
+              set -x
+
               exec tullia run ${lib.escapeShellArg name}
             '';
 
@@ -1386,8 +1393,14 @@ in {
                   then "config"
                   else null
                 } = removeAttrs task.nomad.config [
-                  # must be removed to build a new image for the wrapper through the default value
+                  # must be removed to newly build for the wrapper through the default value
+
+                  # podman driver
                   "image"
+
+                  # exec driver
+                  "store_paths"
+                  "command"
                 ];
 
                 # propagate max dependencies' resources up to wrapper job
