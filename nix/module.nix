@@ -1362,6 +1362,9 @@ in {
               RUNTIME = "unwrapped";
             };
 
+            # `run` must be removed to build a new derivation through the default value
+            unwrapped = removeAttrs task.unwrapped ["run"];
+
             nsjail =
               # `run` must be removed to build a new derivation through the default value
               removeAttrs task.nsjail ["run"]
