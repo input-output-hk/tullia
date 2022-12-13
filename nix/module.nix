@@ -89,19 +89,32 @@
       };
 
     mapCommand = command:
-      if command.main
-      then ''
-        TULLIA_STATUS=0
-        #shellcheck disable=SC2288
-        ${makeCommand command}/bin/${lib.escapeShellArg name} || TULLIA_STATUS="$?"
-        export TULLIA_STATUS
       ''
-      else ''
-        #shellcheck disable=SC2288
-        ${makeCommand command}/bin/${lib.escapeShellArg name}
+        echo -n > "$TULLIA_COMMAND_POST"
+      ''
+      + (
+        if command.main
+        then ''
+          TULLIA_STATUS=0
+          #shellcheck disable=SC2288
+          ${makeCommand command}/bin/${lib.escapeShellArg name} || TULLIA_STATUS="$?"
+          export TULLIA_STATUS
+        ''
+        else ''
+          #shellcheck disable=SC2288
+          ${makeCommand command}/bin/${lib.escapeShellArg name}
+        ''
+      )
+      + ''
+        #shellcheck disable=SC1090
+        source "$TULLIA_COMMAND_POST"
       '';
 
     commandsWrapped = ''
+      TULLIA_COMMAND_POST=$(mktemp -t tullia-command-post.XXX)
+      trap 'rm -f "$TULLIA_COMMAND_POST"' EXIT
+      export TULLIA_COMMAND_POST
+
       ${lib.concatMapStringsSep "\n" mapCommand (
         let
           isMain = {main, ...}: main;
@@ -115,11 +128,13 @@
             ''
           else task.commands
       )}
+
       exit "$TULLIA_STATUS"
     '';
   in
     writers.shell {
       inherit name;
+      runtimeInputs = [pkgs.coreutils];
       text = commandsWrapped;
     };
 
