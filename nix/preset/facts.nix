@@ -91,7 +91,7 @@ in {
     mountFacts = "${facts}:${config.env.TULLIA_FACTS}";
   in
     lib.mkIf cfg.enable {
-      env.TULLIA_FACTS = "/alloc/tullia/facts"; # assuming that `$NOMAD_ALLOC_DIR` is `/alloc`
+      env.TULLIA_FACTS = "/alloc/cicero/facts"; # assuming that `$NOMAD_ALLOC_DIR` is `/alloc`
 
       nomad.templates =
         lib.mapAttrsToList (k: v: {
