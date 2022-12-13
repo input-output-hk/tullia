@@ -44,6 +44,8 @@ in {
         )
       ];
 
+      env.NIX_SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+
       dependencies = with pkgs; [
         coreutils
         gitMinimal
