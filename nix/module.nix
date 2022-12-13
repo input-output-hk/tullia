@@ -999,6 +999,7 @@
             bindmount = {
               rw = lib.mkOrder 300 [
                 ''"$root:/"''
+                ''"$HOME/.netrc:${task.env.HOME}/.netrc"''
                 "/dev"
                 ''"$alloc:/alloc"''
                 ''"$PWD:/repo"''
