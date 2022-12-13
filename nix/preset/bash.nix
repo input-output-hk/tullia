@@ -40,17 +40,20 @@ in {
 
     nsjail = {
       mount."/tmp".options.size = lib.mkDefault 1024;
-      bindmount.rw = lib.mkOrder 300 [
-        ''"$root:/"''
-        "/dev"
-        ''"$alloc:/alloc"''
-        ''"$PWD:/repo"''
-      ];
 
-      bindmount.ro = lib.mkOrder 300 (
-        ["/etc/resolv.conf:/etc/resolv.conf"]
-        ++ config.closure.storePaths
-      );
+      bindmount = {
+        rw = lib.mkOrder 300 [
+          ''"$root:/"''
+          "/dev"
+          ''"$alloc:/alloc"''
+          ''"$PWD:/repo"''
+        ];
+
+        ro = lib.mkOrder 300 (
+          ["/etc/resolv.conf:/etc/resolv.conf"]
+          ++ config.closure.storePaths
+        );
+      };
     };
   };
 }
