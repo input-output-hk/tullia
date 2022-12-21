@@ -18,7 +18,7 @@ import "strings"
 
 		#repo:           =~"^[^/]+/[^/]+$"
 		#target?:        string
-		#target_default: bool | *true
+		#target_default: bool | *false
 
 		if #target != _|_ {
 			#target_default: false
@@ -81,7 +81,7 @@ import "strings"
 		#repo:           =~"^[^/]+/[^/]+$"
 		#branch?:        string
 		#tag?:           string
-		#default_branch: bool | *true
+		#default_branch: bool | *false
 
 		if #branch != _|_ || #tag != _|_ {
 			#default_branch: false
