@@ -1031,6 +1031,12 @@
                 runtimeInputs = task.dependencies;
                 text = ''
                   ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+
+                  if [[ -n "$NOMAD_JOB_ID" ]]; then
+                    mkdir -p ${lib.escapeShellArg task.workingDir}
+                    cd ${lib.escapeShellArg task.workingDir}
+                  fi
+
                   #shellcheck disable=SC2288
                   exec ${task.computedCommand}/bin/${lib.escapeShellArg task.name}
                 '';
@@ -1344,13 +1350,6 @@ in {
             dependencies = [pkgs.tullia];
 
             command.text = ''
-              set +x
-              if [[ -n "$NOMAD_JOB_ID" ]]; then
-                mkdir /repo
-                cd /repo
-              fi
-              set -x
-
               exec tullia run ${lib.escapeShellArg name}
             '';
 
