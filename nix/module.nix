@@ -2,6 +2,7 @@
   lib,
   pkgs,
   config,
+  extendModules,
   rootDir,
   ociRegistry,
   specialArgs,
@@ -1151,9 +1152,26 @@
 
     config = lib.mkIf (action.task != null) (let
       sname = sanitizeServiceName name;
-      t = moduleConfig.wrappedTask.${action.task};
+      extended = extendModules {
+        prefix = [];
+        modules = [
+          ({config, ...}: {
+            task.${action.task}.runtime = let
+              t = config.wrappedTask.${action.task};
+              inherit (t.nomad or t) driver;
+            in
+              {
+                # nomad driver ⇒ tullia runtime
+                podman = "podman";
+                exec = "unwrapped";
+              }
+              .${driver};
+          })
+        ];
+      };
+      t' = extended.config.wrappedTask.${action.task};
     in {
-      job.${sname}.group.tullia.task.tullia = t.nomad or t;
+      job.${sname}.group.tullia.task.tullia = t'.nomad or t';
     });
   });
 
