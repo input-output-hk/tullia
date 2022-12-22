@@ -51,5 +51,4 @@ output?: #output
 	}
 }
 
-// XXX Why does a let declaration not work here?
 _final_inputs: inputs
