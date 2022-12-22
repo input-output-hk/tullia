@@ -45,7 +45,9 @@ in {
           report = getExe (writers.shell {
             name = "github-status-report";
             runtimeInputs = with pkgs; [coreutils jq curl];
-            text =
+            text = let
+              getopts = "c:s:d:e";
+            in
               if cfg.status.enable
               then ''
                 cfgRevision=$(${lib.escapeShellArg cfg.status.revision})
@@ -154,6 +156,10 @@ in {
                   esac
 
                   report "$context" "$state" "$description"
+
+                  if [[ -n "''${returnExitStatus:-}" && -n "''${exitStatus:-}" ]]; then
+                    return "$exitStatus"
+                  fi
                 }
 
                 function reportCommand {
@@ -183,11 +189,12 @@ in {
 
                 trap 'report "$context" error' ERR
 
-                while getopts :c:s:d: opt; do
+                while getopts :${getopts} opt; do
                   case "$opt" in
                     c) context+="$OPTARG" ;;
                     s) state="$OPTARG" ;;
                     d) description="$OPTARG" ;;
+                    e) returnExitStatus=1 ;;
                     ?)
                       >&2 echo 'Unknown flag'
                       exit 1
@@ -215,7 +222,7 @@ in {
               else ''
                 # ignore all flags
                 #shellcheck disable=2034
-                while getopts :c:s:d: opt; do :; done
+                while getopts :${getopts} opt; do :; done
                 shift $((OPTIND - 1))
 
                 if [[ $# -gt 0 ]]; then
@@ -250,6 +257,8 @@ in {
             # The shell variable `$elem` is set to the key from `bulk`.
             # This is interpolated verbatim into the bash source so make sure it is properly escaped.
             skippedDescription ? "Skipped",
+            # Arguments for GNU Parallel.
+            parallelArgs ? [],
           }: let
             name = "github-status-report-bulk";
 
@@ -269,7 +278,7 @@ in {
           in
             getExe (writers.shell {
               inherit name;
-              runtimeInputs = [pkgs.jq];
+              runtimeInputs = with pkgs; [jq parallel];
               text = ''
                 bulk=$(${bulkExe})
 
@@ -285,9 +294,15 @@ in {
                   ${config.preset.github.status.lib.report} -c ${contextSuffix} -s pending -d Queued
                 done
 
-                for elem in $queue; do
-                  ${config.preset.github.status.lib.report} -c ${contextSuffix} -- ${lib.escapeShellArg eachExe} "$elem"
-                done
+                function runElem {
+                  elem="$1" # for contextSuffix
+                  ${config.preset.github.status.lib.report} -e \
+                    -c ${contextSuffix} \
+                    -- ${eachExe} "$1"
+                }
+                export -f runElem
+
+                <<< "$queue" parallel --halt soon,fail=1 --line-buffer --ctag --delay 5s ${lib.escapeShellArgs parallelArgs} runElem
               '';
             });
         };
