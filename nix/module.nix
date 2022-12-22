@@ -1068,12 +1068,13 @@
               ${../lib/github.cue} \
               ${../lib/slack.cue} \
               - <<< ${lib.escapeShellArg ''
-              #lib: _ // convenience to make references work
+              // do not put anything above v so that it can have imports
               ${
                 if __isPath v
                 then __readFile v
                 else v
               }
+              #lib: _ // convenience to make references work
             ''}
 
             substituteInPlace $out \
