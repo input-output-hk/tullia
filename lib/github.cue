@@ -98,10 +98,10 @@ import "strings"
 				if #branch != _|_ || #tag != _|_ {
 					ref: or([
 						if #branch != _|_ {
-							=~"^refs/heads/\(#branch)$"
+							=~"^refs/heads/(\(#branch))$"
 						},
 						if #tag != _|_ {
-							=~"^refs/tags/\(#tag)$"
+							=~"^refs/tags/(\(#tag))$"
 						},
 					])
 				}
