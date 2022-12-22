@@ -1029,7 +1029,7 @@
               '';
               default = writers.shell {
                 name = "${task.name}-unwrapped";
-                runtimeInputs = task.dependencies;
+                runtimeInputs = task.dependencies ++ [pkgs.coreutils];
                 text = ''
                   ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
 
