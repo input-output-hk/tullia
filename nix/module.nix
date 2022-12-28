@@ -201,13 +201,13 @@
     imports = [
       preset/facts.nix
       preset/nix.nix
-      preset/bash.nix
+      preset/env.nix
       preset/github.nix
       preset/git.nix
       {
         preset = {
           facts.enable = lib.mkDefault true;
-          bash.enable = lib.mkDefault true;
+          env.enable = lib.mkDefault true;
         };
       }
     ];

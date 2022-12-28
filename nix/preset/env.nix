@@ -4,23 +4,20 @@
   lib,
   ...
 }: let
-  presetName = "bash";
+  cfg = config.preset.env;
 in {
-  options.preset.${presetName}.enable = lib.mkEnableOption "${presetName} preset";
+  options.preset.env.enable = lib.mkEnableOption "env preset";
 
-  config = lib.mkIf config.preset.${presetName}.enable {
+  config = lib.mkIf cfg.enable {
     dependencies = with pkgs;
       lib.mkDefault [
         coreutils
-        bashInteractive
       ];
 
     env = {
       CURL_CA_BUNDLE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      HOME = lib.mkDefault "/local/home";
       SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-      # handled by the commandType of the runtimeInputs in modules.nix
-      # PATH = lib.makeBinPath config.dependencies;
+      HOME = lib.mkDefault "/local/home";
       TERM = lib.mkDefault "xterm-256color";
       TULLIA_TASK = config.name;
     };
