@@ -302,6 +302,7 @@ in {
                 }
                 export -f runElem
 
+                export PARALLEL_SHELL="$BASH"
                 <<< "$queue" parallel --halt soon,fail=1 --line-buffer --ctag --delay 5s ${lib.escapeShellArgs parallelArgs} runElem
               '';
             });
