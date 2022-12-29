@@ -276,7 +276,10 @@ in {
             bulkExe = mkExe ({name = "${name}-bulk";} // bulk);
             eachExe = mkExe ({name = "${name}-each";} // each);
           in
-            getExe (writers.shell {
+            lib.warnIfNot
+            (builtins.any (p: builtins.elem (lib.getName p) ["bash" "bash-interactive" "busybox"]) config.dependencies)
+            ''Some dependency of the task "${config.name}" must provide /bin/sh for `preset.github.status.lib.reportBulk`.''
+            (getExe (writers.shell {
               inherit name;
               runtimeInputs = with pkgs; [jq parallel];
               text = ''
@@ -305,7 +308,7 @@ in {
                 export PARALLEL_SHELL="$BASH"
                 <<< "$queue" parallel --halt soon,fail=1 --line-buffer --ctag --delay 5s ${lib.escapeShellArgs parallelArgs} runElem
               '';
-            });
+            }));
         };
       };
     };
@@ -384,6 +387,9 @@ in {
           # lib.mkAfter is 1500 so this will always run after
           (lib.mkOrder 1600 [reportStatus])
         ];
+
+      # GNU parallel in `preset.github.status.lib.reportBulk` needs /bin/sh
+      dependencies = [pkgs.bash];
 
       nomad.templates = [
         {
