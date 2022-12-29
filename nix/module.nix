@@ -658,9 +658,10 @@
                         task.oci.image
                         // {__toString = getImageName;}
                       );
-                      exec = {
-                        command = lib.mkDefault "${task.computedCommand}/bin/${task.name}";
-                        store_paths = lib.mkDefault ([task.closure.closure] ++ task.dependencies);
+                      exec = __mapAttrs (_: lib.mkDefault) {
+                        command = "${task.computedCommand}/bin/${task.name}";
+                        nix_installables = [task.closure.closure] ++ task.dependencies;
+                        nix_host = true;
                       };
                     }
                     .${args.config.driver}
@@ -1119,10 +1120,10 @@
                           name = getImageName task.config.image;
                           imageDrv = task.config.image.drvPath;
                         }
-                        else if task.config ? store_paths
+                        else if task.config ? nix_installables
                         then {
                           type = "nix";
-                          derivations = map (p: p.drvPath) task.config.store_paths;
+                          derivations = map (p: p.drvPath) task.config.nix_installables;
                         }
                         else null
                     )
@@ -1417,7 +1418,7 @@ in {
                   "image"
 
                   # exec driver
-                  "store_paths"
+                  "nix_installables"
                   "command"
                 ];
 
