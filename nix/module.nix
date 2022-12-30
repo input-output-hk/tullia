@@ -1032,7 +1032,13 @@
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies ++ [pkgs.coreutils];
                 text = ''
-                  ${__concatStringsSep "\n" (lib.mapAttrsToList (k: v: "export ${k}=${lib.escapeShellArg v}") config.env)}
+                  ${toString (
+                    lib.mapAttrsToList (k: v: ''
+                      #shellcheck disable=SC2016
+                      export ${k}=${lib.escapeShellArg v}
+                    '')
+                    config.env
+                  )}
 
                   if [[ -n "''${NOMAD_JOB_ID:-}" ]]; then
                     mkdir -p ${lib.escapeShellArg task.workingDir}
