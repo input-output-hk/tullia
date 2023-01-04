@@ -795,7 +795,7 @@
                     # if you got the permission error like  Couldn't write '5' bytes to file
                     # '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service//NSJAIL.13077/cgroup.procs'
                     # run the following command
-                    # sudo chown "$USER":users /sys/fs/cgroup/user.slice/user-1000.slice/*
+                    # sudo chown "$USER":users /sys/fs/cgroup/user.slice/user-1000.slice/cgroup.procs
 
                     cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
                     if [ ! -d "$cgroupV2Mount" ]; then

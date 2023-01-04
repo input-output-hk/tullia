@@ -8,6 +8,11 @@ inputs: name: {
     fragmentRelPath,
   }: let
     pkgs = inputs.nixpkgs.legacyPackages.${system};
+    mkCommand = system: type: args:
+      args
+      // {
+        command = pkgs.writeShellScript "${type}-${args.name}" args.command;
+      };
     inherit (pkgs) lib;
     fragmentParts = lib.splitString "/" fragmentRelPath;
     taskName = lib.last fragmentParts;
@@ -29,11 +34,11 @@ inputs: name: {
         '';
       };
 
-    mkAction = runtime: {
+    mkAction = runtime: (mkCommand system "task" {
       name = runtime;
       description = "run this task in ${runtime}";
       command = "${runner runtime}/bin/run-${taskName}";
-    };
+    });
 
     nsjailSpec = mkAction "nsjail";
     podmanSpec = mkAction "podman";
@@ -42,15 +47,15 @@ inputs: name: {
   in
     actions
     ++ [
-      {
+      (mkCommand system "tasks" {
         name = "copyToPodman";
         description = "Push image of this task to local podman";
         command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToPodman";
-      }
-      {
+      })
+      (mkCommand system "tasks" {
         name = "copyToRegistry";
         description = "Push image of this task to remote registry";
         command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToRegistry";
-      }
+      })
     ];
 }
