@@ -13,6 +13,7 @@ in {
     ci = {
       enable = mkEnableOption "preset.github.status and preset.git.clone";
       inherit (options.preset.${name}.status) repository revision;
+      inherit (options.preset.git.clone) remote;
     };
 
     status = {
@@ -344,6 +345,32 @@ in {
             }
           );
         };
+
+        getRepository = factName: default: let
+          fact = config.actionRun.facts.${factName} or null;
+        in
+          fact.value.github_body.pull_request.head.repo.full_name
+          or fact.value.github_body.repository.full_name
+          or default;
+
+        readRepository = factName: default: {
+          outPath = getExe (
+            writers.shell {
+              name = "get-${factName}-github-revision";
+              runtimeInputs = [pkgs.jq];
+              text = ''
+                exec jq --{compact,raw}-output \
+                  --argjson default ${escapeShellArg (__toJSON default)} \
+                  '
+                    .value.github_body.pull_request.head.repo.full_name //
+                    .value.github_body.repository.full_name //
+                    $default
+                  ' \
+                  "$TULLIA_FACTS"/${escapeShellArg factName}.json
+              '';
+            }
+          );
+        };
       };
     };
   };
@@ -359,12 +386,12 @@ in {
         git.clone = {
           enable = true;
           remote = {
-            value = "https://github.com/${cfg.ci.repository.value}";
+            value = "https://github.com/${cfg.ci.remote.value}";
             outPath = lib.getExe (writers.shell {
               name = "get-git-remote";
               text = ''
                 echo -n https://github.com/
-                ${lib.escapeShellArg cfg.ci.repository}
+                ${lib.escapeShellArg cfg.ci.remote}
               '';
             });
           };
