@@ -3,7 +3,7 @@ inputs: name: {
   type = "tullia";
   actions = {
     system,
-    flake,
+    target,
     fragment,
     fragmentRelPath,
   }: let
