@@ -120,7 +120,7 @@ in {
                     --arg description "$description" \
                     --arg context "$context" \
                   | curl "https://api.github.com/repos/$cfgRepository/statuses/$cfgRevision" \
-                    --output /dev/null --fail-with-body \
+                    --output >(read -rd ''') --fail-with-body \
                     --no-progress-meter \
                     -H 'Accept: application/vnd.github.v3+json' \
                     -H @<(echo "Authorization: token $(< "$NOMAD_SECRETS_DIR"/cicero/github/token)") \
