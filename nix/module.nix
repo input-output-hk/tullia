@@ -1032,17 +1032,19 @@
                 name = "${task.name}-unwrapped";
                 runtimeInputs = task.dependencies ++ [pkgs.coreutils];
                 text = ''
-                  ${toString (
-                    lib.mapAttrsToList (k: v: ''
-                      #shellcheck disable=SC2016
-                      export ${k}=${lib.escapeShellArg v}
-                    '')
-                    config.env
-                  )}
-
-                  if [[ -n "''${NOMAD_JOB_ID:-}" ]]; then
+                  if [[ -v NOMAD_JOB_ID ]]; then
                     mkdir -p ${lib.escapeShellArg task.workingDir}
                     cd ${lib.escapeShellArg task.workingDir}
+                  else
+                    # Do not set env vars when we're running in Nomad as the job will already have them
+                    # and transformers may have made further changes which we do not want to overwrite.
+                    ${__concatStringsSep "\n" (
+                      lib.mapAttrsToList (k: v: ''
+                        #shellcheck disable=SC2016
+                        export ${k}=${lib.escapeShellArg v}
+                      '')
+                      config.env
+                    )}
                   fi
 
                   #shellcheck disable=SC2288
