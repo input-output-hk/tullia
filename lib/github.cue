@@ -1,5 +1,8 @@
 import "strings"
 
+inputs: _
+let final_inputs = inputs
+
 #lib: io: {
 	let #repo_full_name = =~"^[^/]+/[^/]+$"
 
@@ -56,7 +59,7 @@ import "strings"
 			}
 		}
 
-		let body = inputs["\(#input)"].value.github_body
+		let body = final_inputs[#input].match.github_body
 		_repo:           body.repository.full_name
 		_target:         body.pull_request.base.ref
 		_default_branch: body.repository.default_branch
@@ -123,7 +126,7 @@ import "strings"
 			}
 		}
 
-		let body = inputs["\(#input)"].value.github_body
+		let body = final_inputs[#input].match.github_body
 		_repo:           body.repository.full_name
 		_branch:         strings.TrimPrefix(body.ref, "refs/heads/")
 		_tag:            strings.TrimPrefix(body.ref, "refs/tags/")

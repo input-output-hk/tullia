@@ -17,6 +17,8 @@ import "struct"
 inputs:  #inputs
 output?: #output
 
+let final_inputs = inputs
+
 #lib: {
 	_#io: {
 		inputs?: #inputs
@@ -45,10 +47,8 @@ output?: #output
 
 			output: {
 				io
-				inputs: _final_inputs
+				inputs: final_inputs
 			}.output
 		}
 	}
 }
-
-_final_inputs: inputs
