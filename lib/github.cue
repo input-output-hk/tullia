@@ -1,6 +1,8 @@
 import "strings"
 
 #lib: io: {
+	let #repo_full_name = =~"^[^/]+/[^/]+$"
+
 	github_pr: {
 		#input: {
 			result: string | *"GitHub PR to \(#repo)\(_target)\(_target_default)"
@@ -16,7 +18,7 @@ import "strings"
 			}
 		}.result
 
-		#repo:           =~"^[^/]+/[^/]+$"
+		#repo:           #repo_full_name
 		#target?:        string
 		#target_default: bool | *false
 
@@ -39,9 +41,9 @@ import "strings"
 					head: sha: string
 				}
 
+				repository: default_branch: string
 				if #target_default {
 					pull_request: base: ref: repository.default_branch
-					repository: default_branch: string
 				}
 			}
 		}
@@ -78,7 +80,7 @@ import "strings"
 			_tag: *" on tag \(#tag)" | ""
 		}.result
 
-		#repo:           =~"^[^/]+/[^/]+$"
+		#repo:           #repo_full_name
 		#branch?:        string
 		#tag?:           string
 		#default_branch: bool | *false
