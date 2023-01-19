@@ -5,7 +5,6 @@ import "struct"
 		match: {...}
 		not?:      bool
 		optional?: bool
-		...
 	}
 }
 
