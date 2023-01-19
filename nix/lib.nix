@@ -62,8 +62,11 @@ in rec {
             # Convert the attrset of jobs (must be only one)
             # to an API JSON job definition.
             job =
-              pkgs.lib.nix-nomad.transformers.Job.toJSON
-              (pkgs.lib.last (__attrValues v.job));
+              if v.job == {}
+              then null # decision action
+              else
+                pkgs.lib.nix-nomad.transformers.Job.toJSON
+                (pkgs.lib.last (__attrValues v.job));
           })
         config.action;
       };
