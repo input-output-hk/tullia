@@ -128,9 +128,27 @@ let final_inputs = inputs
 
 		let body = final_inputs[#input].match.github_body
 		_repo:           body.repository.full_name
-		_branch:         strings.TrimPrefix(body.ref, "refs/heads/")
-		_tag:            strings.TrimPrefix(body.ref, "refs/tags/")
 		_default_branch: body.repository.default_branch
 		_revision:       body.head_commit.id
+		_branch: {
+			let prefix = "refs/heads/"
+			let hasPrefix = strings.HasPrefix(body.ref, prefix)
+			if hasPrefix {
+				strings.TrimPrefix(body.ref, prefix)
+			}
+			if !hasPrefix {
+				_|_
+			}
+		}
+		_tag: {
+			let prefix = "refs/tags/"
+			let hasPrefix = strings.HasPrefix(body.ref, prefix)
+			if hasPrefix {
+				strings.TrimPrefix(body.ref, prefix)
+			}
+			if !hasPrefix {
+				_|_
+			}
+		}
 	}
 }
