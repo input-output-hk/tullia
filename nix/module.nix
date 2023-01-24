@@ -593,20 +593,18 @@
           };
 
           config = {
-            layers = lib.mkDefault (
-              lib.optional (rootDir != null) (
-                pkgs.buildLayer {
-                  copyToRoot = [
-                    (pkgs.symlinkJoin {
-                      name = "rootDir";
-                      paths = [rootDir];
-                    })
-                  ];
-                }
-              )
+            layers = lib.optional (rootDir != null) (
+              pkgs.buildLayer {
+                copyToRoot = [
+                  (pkgs.symlinkJoin {
+                    name = "rootDir";
+                    paths = [rootDir];
+                  })
+                ];
+              }
             );
 
-            copyToRoot = lib.mkDefault [
+            copyToRoot = [
               (pkgs.symlinkJoin {
                 name = "root";
                 paths = [task.closure.closure] ++ task.dependencies;
@@ -1375,7 +1373,7 @@ in {
             task
           )
           // {
-            dependencies = [pkgs.tullia];
+            dependencies = task.dependencies ++ [pkgs.tullia];
 
             command.text = ''
               exec tullia run ${lib.escapeShellArg name}
@@ -1410,7 +1408,7 @@ in {
             podman = removeAttrs task.podman ["run"];
 
             # these must be removed to configure a new image through their default values
-            oci = removeAttrs task.oci ["config" "image" "name" "cmd"];
+            oci = removeAttrs task.oci ["config" "image" "copyToRoot" "name" "cmd"];
 
             nomad =
               task.nomad

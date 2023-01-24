@@ -9,11 +9,6 @@ in {
   options.preset.env.enable = lib.mkEnableOption "env preset";
 
   config = lib.mkIf cfg.enable {
-    dependencies = with pkgs;
-      lib.mkDefault [
-        coreutils
-      ];
-
     env = {
       CURL_CA_BUNDLE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
       SSL_CERT_FILE = lib.mkDefault "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
