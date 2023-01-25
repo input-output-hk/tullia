@@ -81,7 +81,8 @@ in {
     '';
   };
 
-  mdbook-nix-eval = nixpkgs.rustPlatform.buildRustPackage rec {
+  # does not compile with rust newer than 1.60.0 (from nixos-22.05)
+  mdbook-nix-eval = (__getFlake github:nixos/nixpkgs/0874168639713f547c05947c76124f78441ea46c).legacyPackages.${nixpkgs.system}.rustPlatform.buildRustPackage rec {
     pname = "mdbook-nix-eval";
     version = "1.0.1";
 
