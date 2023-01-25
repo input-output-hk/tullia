@@ -108,4 +108,40 @@ in {
       end
     ''
     // {preset.nix.enable = true;};
+
+  test-nix-systems = {config, name, pkgs, ...}: {
+    preset.nix.enable = true;
+
+    command.text = ''
+      nix-systems || :
+
+      nix show-config
+
+      buildersFile=$(nix show-config --json | jq .builders.value -r)
+      cat "''${buildersFile#@}" || :
+
+      whoami
+      ls -lah "$HOME" -d || :
+
+      echo "NIX_REMOTE: ''${NIX_REMOTE:-(unset)}"
+      ls -lah /nix/var/nix/daemon-socket || :
+    '';
+
+    dependencies = with pkgs; [jq];
+
+    nomad = {
+      inherit (config.actionRun.facts.trigger.value."tullia/${name}") driver;
+
+      templates = [
+        {
+          destination = "${config.env.HOME}/readme";
+          data = ''
+            This file just exists to test our nomad patch
+            that should ensure ${config.env.HOME} is owned
+            by the task user or nobody.
+          '';
+        }
+      ];
+    };
+  };
 }
