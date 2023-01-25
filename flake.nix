@@ -2,7 +2,7 @@
   description = "Tullia - the hero Cicero deserves";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.05";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-22.11";
     nix2container.url = "github:nlewo/nix2container";
     std.url = "github:divnix/std";
     nix-nomad = {
