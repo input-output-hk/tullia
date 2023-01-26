@@ -34,19 +34,21 @@ let final_inputs = inputs
 			github_body: {
 				action: "opened" | "reopened" | "synchronize"
 
-				repository: full_name: #repo
-
-				pull_request: {
-					if #target != _|_ {
-						base: ref: =~#target
-					}
-
-					head: sha: string
+				repository: {
+					full_name:      #repo
+					default_branch: string
 				}
 
-				repository: default_branch: string
-				if #target_default {
-					pull_request: base: ref: repository.default_branch
+				pull_request: {
+					head: sha: string
+					base: ref: string & {
+						if #target_default {
+							repository.default_branch
+						}
+						if #target != _|_ {
+							=~#target
+						}
+					}
 				}
 			}
 		}
@@ -96,24 +98,27 @@ let final_inputs = inputs
 			github_event: "push"
 			github_body: {
 				deleted: false
-				repository: full_name: #repo
-				head_commit: id:       string
+				head_commit: id: string
 
-				ref: string
-				if #branch != _|_ || #tag != _|_ {
-					ref: or([
-						if #branch != _|_ {
-							=~"^refs/heads/(\(#branch))$"
-						},
-						if #tag != _|_ {
-							=~"^refs/tags/(\(#tag))$"
-						},
-					])
+				repository: {
+					full_name:      #repo
+					default_branch: string
 				}
 
-				repository: default_branch: string
-				if #default_branch {
-					ref: "refs/heads/\(repository.default_branch)"
+				ref: {
+					if #default_branch {
+						"refs/heads/\(repository.default_branch)"
+					}
+					if #branch != _|_ || #tag != _|_ {
+						or([
+							if #branch != _|_ {
+								=~"^refs/heads/(\(#branch))$"
+							},
+							if #tag != _|_ {
+								=~"^refs/tags/(\(#tag))$"
+							},
+						])
+					}
 				}
 			}
 		}
