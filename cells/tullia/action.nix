@@ -2,7 +2,7 @@
   cell,
   inputs,
 }: {
-  ci = {
+  "tullia/ci" = {
     io = ./ci.cue;
     task = "build";
   };
