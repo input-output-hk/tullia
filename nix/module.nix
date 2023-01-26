@@ -1037,12 +1037,12 @@
                     # Do not set env vars when we're running in Nomad as the job will already have them
                     # and transformers may have made further changes which we do not want to overwrite.
                     ${__concatStringsSep "\n" (
-                      lib.mapAttrsToList (k: v: ''
-                        #shellcheck disable=SC2016
-                        export ${k}=${lib.escapeShellArg v}
-                      '')
-                      config.env
-                    )}
+                    lib.mapAttrsToList (k: v: ''
+                      #shellcheck disable=SC2016
+                      export ${k}=${lib.escapeShellArg v}
+                    '')
+                    config.env
+                  )}
                   fi
 
                   #shellcheck disable=SC2288
