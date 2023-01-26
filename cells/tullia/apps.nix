@@ -165,7 +165,7 @@ in {
           )
         fi
 
-        jq --raw-{input,output} --slurp ''${nullInput:-} \
+        jq --raw-{input,output} --slurp "''${nullInput:-}" \
           --argjson local "''${local:-true}" \
           --argjson remote "''${remote:-true}" \
           --argjson stdin "''${stdin:-false}" \
