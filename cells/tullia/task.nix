@@ -109,7 +109,12 @@ in {
     ''
     // {preset.nix.enable = true;};
 
-  test-nix-systems = {config, name, pkgs, ...}: {
+  test-nix-systems = {
+    config,
+    name,
+    pkgs,
+    ...
+  }: {
     preset.nix.enable = true;
 
     command.text = ''
