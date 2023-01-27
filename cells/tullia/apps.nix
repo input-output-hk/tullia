@@ -116,7 +116,7 @@ in {
         fi
 
         while getopts :lrIioOh opt; do
-          case "$opt" in
+          case $opt in
             l) remote=false ;;
             r) local=false ;;
             I) stdinJson=false ;&
@@ -141,7 +141,7 @@ in {
         done
         shift $((OPTIND - 1))
 
-        if [[ -z "''${stdin:-}" ]]; then
+        if [[ -z ''${stdin:-} ]]; then
           nullInput=--null-input
         fi
 
