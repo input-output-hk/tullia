@@ -105,7 +105,7 @@ let final_inputs = inputs
 					default_branch: string
 				}
 
-				ref: {
+				ref: string & {
 					if #default_branch {
 						"refs/heads/\(repository.default_branch)"
 					}
