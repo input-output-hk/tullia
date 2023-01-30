@@ -1,4 +1,7 @@
-import "struct"
+import (
+	"list"
+	"struct"
+)
 
 #inputs: struct.MinFields(1) & {
 	[string]: {
@@ -35,10 +38,17 @@ let final_inputs = inputs
 			inputs: _
 			output: _
 
-			for i in [
-				for io in #ios
-				for k, _ in io.inputs {k},
-			] {
+			let input_names = list.SortStrings([ for io in #ios for k, _ in io.inputs {k}])
+			let input_names_unique = [
+				for i, v in input_names
+				let i2 = {
+					if i-1 < 0 {0}
+					if i-1 >= 0 {i - 1}
+				}
+				if i2 != i || input_names[i2] != v {v},
+			]
+
+			for i in input_names_unique {
 				inputs: "\(i)": {
 					match: or([
 						for io in #ios
