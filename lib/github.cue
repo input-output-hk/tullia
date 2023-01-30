@@ -25,10 +25,6 @@ let final_inputs = inputs
 		#target?:        string
 		#target_default: bool | *false
 
-		if #target != _|_ {
-			#target_default: false
-		}
-
 		inputs: "\(#input)": match: {
 			github_event: "pull_request"
 			github_body: {
@@ -42,12 +38,15 @@ let final_inputs = inputs
 				pull_request: {
 					head: sha: string
 					base: ref: string & {
-						if #target_default {
-							repository.default_branch
-						}
-						if #target != _|_ {
-							=~#target
-						}
+						let terms = [
+							if #target_default {
+								repository.default_branch
+							},
+							if #target != _|_ {
+								=~"^\(#target)$"
+							},
+						]
+						if len(terms) != 0 {or(terms)}
 					}
 				}
 			}
@@ -90,10 +89,6 @@ let final_inputs = inputs
 		#tag?:           string
 		#default_branch: bool | *false
 
-		if #branch != _|_ || #tag != _|_ {
-			#default_branch: false
-		}
-
 		inputs: "\(#input)": match: {
 			github_event: "push"
 			github_body: {
@@ -106,19 +101,18 @@ let final_inputs = inputs
 				}
 
 				ref: string & {
-					if #default_branch {
-						"refs/heads/\(repository.default_branch)"
-					}
-					if #branch != _|_ || #tag != _|_ {
-						or([
-							if #branch != _|_ {
-								=~"^refs/heads/(\(#branch))$"
-							},
-							if #tag != _|_ {
-								=~"^refs/tags/(\(#tag))$"
-							},
-						])
-					}
+					let terms = [
+						if #default_branch {
+							"refs/heads/\(repository.default_branch)"
+						},
+						if #branch != _|_ {
+							=~"^refs/heads/(\(#branch))$"
+						},
+						if #tag != _|_ {
+							=~"^refs/tags/(\(#tag))$"
+						},
+					]
+					if len(terms) != 0 {or(terms)}
 				}
 			}
 		}
