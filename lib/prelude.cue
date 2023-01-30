@@ -35,21 +35,26 @@ let final_inputs = inputs
 			inputs: _
 			output: _
 
-			for io in #ios {
-				for k, v in io.inputs {
-					inputs: "\(k)": {
-						match: or([ for io2 in #ios {io2.inputs[k].match}])
+			for i in [
+				for io in #ios
+				for k, _ in io.inputs {k},
+			] {
+				inputs: "\(i)": {
+					match: or([
+						for io in #ios
+						let input = io.inputs[i]
+						if input != _|_ {input.match},
+					])
 
-						if v.not != _|_ {
-							not: v.not
-						}
-
-						if v.optional != _|_ {
-							optional: v.optional
-						}
-					}
+					for io in #ios
+					let input = io.inputs[i]
+					if input != _|_
+					for k, v in input
+					if k != "match" {"\(k)": v}
 				}
+			}
 
+			for io in #ios {
 				output: {
 					io
 					inputs: final_inputs
