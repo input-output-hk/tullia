@@ -120,8 +120,13 @@ let final_inputs = inputs
 		output: {
 			success: ok: true
 			failure: ok: false
-			if _revision != _|_ {
-				[string]: revision: _revision
+			[string]: {
+				if _revision != _|_ {
+					revision: _revision
+				}
+				if _tag != _|_ {
+					tag: _tag
+				}
 			}
 		}
 
