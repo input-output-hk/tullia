@@ -741,94 +741,66 @@
               description = ''
                 Execute the task in a nsjail sandbox
               '';
-              default = let
-                c = config.nsjail;
+              default = writers.shell {
+                name = "${config.name}-nsjail";
+                runtimeInputs = with pkgs; [coreutils nsjail];
+                text = ''
+                  # TODO: This is tied to systemd... find a way to make it cross-platform.
+                  uid="''${UID:-$(id -u)}"
+                  gid="''${GID:-$(id -g)}"
 
-                toMountFlag = lib.mapAttrsToList (_: {
-                  from,
-                  to,
-                  type,
-                  options,
-                }: "${from}:${to}:${type}:${__concatStringsSep "," (lib.mapAttrsToList (
-                    n: v: let
-                      converted =
-                        if n == "size"
-                        then v * 1024 * 1024 # megabytes to bytes
-                        else v;
-                    in "${n}=${toString converted}"
-                  )
-                  options)}");
 
-                flags = {
-                  quiet = c.quiet;
-                  verbose = c.verbose;
-                  time_limit = c.timeLimit;
-                  disable_clone_newnet = !c.cloneNewnet;
-                  rlimit_as = c.rlimit.as;
-                  rlimit_core = c.rlimit.core;
-                  rlimit_cpu = c.rlimit.cpu;
-                  rlimit_fsize = c.rlimit.fsize;
-                  rlimit_nofile = c.rlimit.nofile;
-                  rlimit_nproc = c.rlimit.nproc;
-                  rlimit_stack = c.rlimit.stack;
-                  cgroup_cpu_ms_per_sec = c.cgroup.cpuMsPerSec;
-                  cgroup_mem_max = c.cgroup.memMax;
-                  cgroup_net_cls_classid = c.cgroup.netClsClassid;
-                  cgroup_pids_max = c.cgroup.pidsMax;
-                  skip_setsid = !c.setsid;
-                  cwd = c.cwd;
-                  bindmount = c.bindmount.rw;
-                  bindmount_ro = c.bindmount.ro;
-                  mount = toMountFlag c.mount;
-                  env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") (config.env);
+                  # if you got the permission error like  Couldn't write '5' bytes to file
+                  # '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service//NSJAIL.13077/cgroup.procs'
+                  # run the following command
+                  # sudo chown "$USER":users /sys/fs/cgroup/user.slice/user-1000.slice/cgroup.procs
+
+                  cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
+                  if [ ! -d "$cgroupV2Mount" ]; then
+                    unset cgroupV2Mount
+                  fi
+
+                  alloc="''${alloc:-$(mktemp -d -t alloc.XXXXXXXXXX)}"
+                  root="$(mktemp -d -t root.XXXXXXXXXX)"
+                  mkdir -p "$root"/{etc,tmp,local,bin,usr/bin}
+                  ln -s ${pkgs.bashInteractive}/bin/sh "$root/bin/sh"
+                  ln -s ${pkgs.coreutils}/usr/bin/env "$root/usr/bin/env"
+
+                  function finish {
+                    status="$?"
+                    chmod u+w -R "$root" 2>/dev/null
+                    rm -rf "$alloc" "$root"
+                    exit "$status"
+                  }
+                  trap finish EXIT
+
+                  echo "nixbld:x:$uid:nixbld1" > "$root/etc/group"
+                  echo "nixbld1:x:$uid:$gid:nixbld 1:${task.env.HOME}:${pkgs.shadow}/bin/nologin" > "$root/etc/passwd"
+                  echo "nixbld1:$gid:100" > "$root/etc/subgid"
+                  echo "nixbld1:$uid:100" > "$root/etc/subuid"
+
+                  nsjail -Mo ${toString (lib.cli.toGNUCommandLine {} config.nsjail.flags)} \
+                    --user "$uid" \
+                    --group "$gid" \
+                    ''${cgroupV2Mount:+--use_cgroupv2} \
+                    ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
+                    -- ${task.computedCommand}/bin/${lib.escapeShellArg config.name}
+                '';
+              };
+            };
+
+            flags = mkOption {
+              type = submodule {
+                freeformType = anything;
+                options.env = mkOption {
+                  type = listOf str;
+                  default = [];
                 };
-              in
-                writers.shell {
-                  name = "${config.name}-nsjail";
-                  runtimeInputs = with pkgs; [coreutils nsjail];
-                  text = ''
-                    # TODO: This is tied to systemd... find a way to make it cross-platform.
-                    uid="''${UID:-$(id -u)}"
-                    gid="''${GID:-$(id -g)}"
-
-
-                    # if you got the permission error like  Couldn't write '5' bytes to file
-                    # '/sys/fs/cgroup/user.slice/user-1000.slice/user@1000.service//NSJAIL.13077/cgroup.procs'
-                    # run the following command
-                    # sudo chown "$USER":users /sys/fs/cgroup/user.slice/user-1000.slice/cgroup.procs
-
-                    cgroupV2Mount="/sys/fs/cgroup/user.slice/user-$uid.slice/user@$uid.service"
-                    if [ ! -d "$cgroupV2Mount" ]; then
-                      unset cgroupV2Mount
-                    fi
-
-                    alloc="''${alloc:-$(mktemp -d -t alloc.XXXXXXXXXX)}"
-                    root="$(mktemp -d -t root.XXXXXXXXXX)"
-                    mkdir -p "$root"/{etc,tmp,local,bin,usr/bin}
-                    ln -s ${pkgs.bashInteractive}/bin/sh "$root/bin/sh"
-                    ln -s ${pkgs.coreutils}/usr/bin/env "$root/usr/bin/env"
-
-                    function finish {
-                      status="$?"
-                      chmod u+w -R "$root" 2>/dev/null
-                      rm -rf "$alloc" "$root"
-                      exit "$status"
-                    }
-                    trap finish EXIT
-
-                    echo "nixbld:x:$uid:nixbld1" > "$root/etc/group"
-                    echo "nixbld1:x:$uid:$gid:nixbld 1:${task.env.HOME}:${pkgs.shadow}/bin/nologin" > "$root/etc/passwd"
-                    echo "nixbld1:$gid:100" > "$root/etc/subgid"
-                    echo "nixbld1:$uid:100" > "$root/etc/subuid"
-
-                    nsjail -Mo ${toString (lib.cli.toGNUCommandLine {} flags)} \
-                      --user "$uid" \
-                      --group "$gid" \
-                      ''${cgroupV2Mount:+--use_cgroupv2} \
-                      ''${cgroupV2Mount:+--cgroupv2_mount "$cgroupV2Mount"} \
-                      -- ${task.computedCommand}/bin/${lib.escapeShellArg config.name}
-                  '';
-                };
+              };
+              description = ''
+                Command line flags for nsjail.
+                The default is computed from all the other options.
+              '';
             };
 
             setsid = mkOption {
@@ -1009,6 +981,47 @@
                 ["/etc/resolv.conf:/etc/resolv.conf"]
                 ++ config.closure.storePaths
               );
+            };
+
+            flags = let
+              c = config.nsjail;
+
+              toMountFlag = lib.mapAttrsToList (_: {
+                from,
+                to,
+                type,
+                options,
+              }: "${from}:${to}:${type}:${__concatStringsSep "," (lib.mapAttrsToList (
+                  n: v: let
+                    converted =
+                      if n == "size"
+                      then v * 1024 * 1024 # megabytes to bytes
+                      else v;
+                  in "${n}=${toString converted}"
+                )
+                options)}");
+            in {
+              quiet = c.quiet;
+              verbose = c.verbose;
+              time_limit = c.timeLimit;
+              disable_clone_newnet = !c.cloneNewnet;
+              rlimit_as = c.rlimit.as;
+              rlimit_core = c.rlimit.core;
+              rlimit_cpu = c.rlimit.cpu;
+              rlimit_fsize = c.rlimit.fsize;
+              rlimit_nofile = c.rlimit.nofile;
+              rlimit_nproc = c.rlimit.nproc;
+              rlimit_stack = c.rlimit.stack;
+              cgroup_cpu_ms_per_sec = c.cgroup.cpuMsPerSec;
+              cgroup_mem_max = c.cgroup.memMax;
+              cgroup_net_cls_classid = c.cgroup.netClsClassid;
+              cgroup_pids_max = c.cgroup.pidsMax;
+              skip_setsid = !c.setsid;
+              cwd = c.cwd;
+              bindmount = c.bindmount.rw;
+              bindmount_ro = c.bindmount.ro;
+              mount = toMountFlag c.mount;
+              env = lib.mapAttrsToList (k: v: lib.escapeShellArg "${k}=${v}") config.env;
             };
           };
         };
