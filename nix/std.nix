@@ -2,13 +2,13 @@ inputs: name: {
   inherit name;
   type = "tullia";
   actions = {
-    system,
+    currentSystem,
     target,
     fragment,
     fragmentRelPath,
   }: let
-    pkgs = inputs.nixpkgs.legacyPackages.${system};
-    mkCommand = system: type: args:
+    pkgs = inputs.nixpkgs.legacyPackages.${currentSystem};
+    mkCommand = currentSystem: type: args:
       args
       // {
         command = pkgs.writeShellScript "${type}-${args.name}" args.command;
@@ -16,25 +16,25 @@ inputs: name: {
     inherit (pkgs) lib;
     fragmentParts = lib.splitString "/" fragmentRelPath;
     taskName = lib.last fragmentParts;
-    tullia = inputs.self.packages.${system}.default;
+    tullia = inputs.self.packages.${currentSystem}.default;
 
     runner = runtime:
       pkgs.writeShellApplication {
         name = "run-${taskName}";
         runtimeInputs = [tullia];
         text = ''
-          nix build --no-link .#tullia.${system}.wrappedTask.${taskName}.${runtime}.run
+          nix build --no-link .#tullia.${currentSystem}.wrappedTask.${taskName}.${runtime}.run
           tullia run ${lib.escapeShellArg taskName} \
             ${toString (lib.cli.toGNUCommandLine {} {
-            task-flake = ".#tullia.${system}.wrappedTask";
-            dag-flake = ".#tullia.${system}.dag";
+            task-flake = ".#tullia.${currentSystem}.wrappedTask";
+            dag-flake = ".#tullia.${currentSystem}.dag";
             mode = "passthrough";
             runtime = runtime;
           })}
         '';
       };
 
-    mkAction = runtime: (mkCommand system "task" {
+    mkAction = runtime: (mkCommand currentSystem "task" {
       name = runtime;
       description = "run this task in ${runtime}";
       command = "${runner runtime}/bin/run-${taskName}";
@@ -47,15 +47,15 @@ inputs: name: {
   in
     actions
     ++ [
-      (mkCommand system "tasks" {
+      (mkCommand currentSystem "tasks" {
         name = "copyToPodman";
         description = "Push image of this task to local podman";
-        command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToPodman";
+        command = "nix run .#tullia.${currentSystem}.task.${taskName}.oci.image.copyToPodman";
       })
-      (mkCommand system "tasks" {
+      (mkCommand currentSystem "tasks" {
         name = "copyToRegistry";
         description = "Push image of this task to remote registry";
-        command = "nix run .#tullia.${system}.task.${taskName}.oci.image.copyToRegistry";
+        command = "nix run .#tullia.${currentSystem}.task.${taskName}.oci.image.copyToRegistry";
       })
     ];
 }
