@@ -8,6 +8,7 @@ import (
 		match: {...}
 		not?:      bool
 		optional?: bool
+		...
 	}
 }
 
