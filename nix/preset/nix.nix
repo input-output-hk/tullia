@@ -39,6 +39,7 @@ in {
             cat <<EOF > $out/etc/nix/nix.conf
             sandbox = false
             accept-flake-config = true
+            max-jobs = auto
             EOF
           ''
         )
