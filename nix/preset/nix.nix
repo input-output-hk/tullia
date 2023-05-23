@@ -81,7 +81,6 @@ in {
       commands = lib.mkOrder 300 [
         {
           type = "shell";
-          runtimeInputs = [pkgs.nix];
           text = ''
             # Set up build user and group.
             echo >> /etc/passwd 'nixbld1:x:1000:100:Nix build user 1:${config.env.HOME}:/bin/sh'
@@ -89,15 +88,6 @@ in {
             echo >> /etc/group  'nixbld:x:100:nixbld1'
             echo >> /etc/subgid 'nixbld1:1000:100'
             echo >> /etc/subuid 'nixbld1:1000:100'
-
-            if [[ ! -s /registration ]]; then
-              exit 0
-            fi
-
-            if command -v nix-store >/dev/null; then
-              echo populating nix store...
-              nix-store --load-db < /registration
-            fi
           '';
         }
         {
@@ -117,5 +107,27 @@ in {
         }
       ];
     })
+
+    (lib.mkIf (
+        (config.runtime == "podman")
+        || (config.runtime == "unwrapped")
+        && config.nomad.driver == "exec"
+        # XXX This is what we really want but it leads to infinite recursion.
+        # Instead we check at runtime whether the nix DB already exists (mounted from the host).
+        # && !(config.nomad.config.nix_host or true)
+      ) {
+        commands = lib.mkOrder 310 [
+          {
+            type = "shell";
+            runtimeInputs = with pkgs; [nix];
+            text = ''
+              if [[ -s /registration && ! -s /nix/var/nix/db/db.sqlite ]]; then
+                echo >&2 'Populating nix store...'
+                nix-store --load-db < /registration
+              fi
+            '';
+          }
+        ];
+      })
   ]);
 }
